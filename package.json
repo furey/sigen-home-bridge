@@ -1,0 +1,33 @@
+{
+  "name": "sigen-home-bridge",
+  "version": "0.1.0",
+  "description": "Local Modbus TCP bridge exposing Sigenergy solar and battery data to Apple HomeKit, Google Home, and a web dashboard.",
+  "type": "module",
+  "license": "MIT",
+  "author": "James Furey",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/furey/sigen-home-bridge.git"
+  },
+  "engines": {
+    "node": ">=24.15.0",
+    "npm": ">=11.10.0"
+  },
+  "scripts": {
+    "predev": "node scripts/free-dev-ports.js",
+    "dev": "concurrently -k -n server,ui -c green,cyan \"npm --prefix server run dev\" \"npm --prefix ui run dev\"",
+    "build": "npm --prefix ui run build",
+    "start": "npm --prefix server start",
+    "probe": "npm --prefix server run probe",
+    "test": "npm --prefix server test",
+    "screenshots": "scripts/capture-screenshots.sh",
+    "walkthrough": "scripts/capture-walkthrough.sh",
+    "install:all": "npm install && npm --prefix server install && npm --prefix ui install"
+  },
+  "volta": {
+    "node": "24.15.0"
+  },
+  "devDependencies": {
+    "concurrently": "10.0.3"
+  }
+}

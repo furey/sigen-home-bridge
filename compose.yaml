@@ -1,0 +1,33 @@
+name: sigen-home-bridge
+
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "3"
+
+services:
+  sigen-home-bridge:
+    build: .
+    container_name: sigen-home-bridge
+    restart: unless-stopped
+    network_mode: host
+    env_file: .env
+    volumes:
+      - sigen-data:/data
+    <<: *logging
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: sigen-cloudflared
+    restart: unless-stopped
+    network_mode: host
+    profiles: [tunnel]
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - sigen-home-bridge
+    <<: *logging
+
+volumes:
+  sigen-data:

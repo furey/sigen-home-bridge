@@ -1,0 +1,31 @@
+{
+  "name": "sigen-home-bridge-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "engines": {
+    "node": ">=24.15.0",
+    "npm": ">=11.10.0"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "probe": "node probe.js",
+    "test": "vitest run"
+  },
+  "volta": {
+    "node": "24.15.0"
+  },
+  "dependencies": {
+    "dotenv": "17.4.2",
+    "express": "5.2.1",
+    "hap-nodejs": "0.14.3",
+    "modbus-serial": "8.0.25",
+    "qrcode-svg": "1.1.0",
+    "qrcode-terminal": "0.12.0"
+  },
+  "devDependencies": {
+    "vitest": "4.1.8"
+  }
+}

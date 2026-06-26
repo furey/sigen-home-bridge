@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("./assets/fonts/inter-latin-cv01.woff2") format("woff2");
+}
+
+@utility p-safe {
+  padding-top: max(var(--safe-floor-top), env(safe-area-inset-top));
+  padding-right: max(--spacing(6), env(safe-area-inset-right));
+  padding-bottom: max(--spacing(6), env(safe-area-inset-bottom));
+  padding-left: max(--spacing(6), env(safe-area-inset-left));
+}
+
+@utility px-safe {
+  padding-right: max(--spacing(6), env(safe-area-inset-right));
+  padding-left: max(--spacing(6), env(safe-area-inset-left));
+}
+
+@utility pt-safe {
+  padding-top: max(var(--safe-floor-top), env(safe-area-inset-top));
+}
+
+@utility min-h-app {
+  min-height: var(--app-min-height);
+}
+
+@utility h-app {
+  height: var(--app-min-height);
+}
+
+@layer base {
+  p {
+    text-wrap: pretty;
+  }
+}
+
+:root {
+  color-scheme: dark;
+  --safe-floor-top: 1.5rem;
+  --app-min-height: 100svh;
+}
+
+@media (display-mode: standalone) {
+  :root {
+    --app-min-height: 100vh;
+  }
+}
+
+@media (display-mode: browser) and (max-width: 639px) {
+  :root {
+    --safe-floor-top: 0.75rem;
+  }
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  background-color: #09090b;
+}
+
+body {
+  margin: 0;
+  color: #fafafa;
+  font-family: var(--font-sans);
+  font-feature-settings: "cv01" 1;
+}
+
+.tabular-nums {
+  font-variant-numeric: normal;
+  font-feature-settings: "tnum" 1, "cv01" 1;
+}
+
+button:not(:disabled),
+[role="button"],
+a {
+  cursor: pointer;
+}
