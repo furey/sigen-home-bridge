@@ -43,9 +43,9 @@
 
 ## What `sigen-home-bridge` is
 
-Your Sigenergy inverter tracks solar production, battery charge, grid import/export, and home consumption, but the only way to see those numbers is the mySigen app, which routes through Sigenergy's cloud.
+Your Sigenergy inverter tracks solar production, battery charge, grid import/export, and home consumption. The mySigen app shows those numbers, but it routes through Sigenergy's cloud. The gateway also exposes them locally over Modbus TCP, so anything on your network can read them directly: Home Assistant, other open-source projects, or a script you write yourself.
 
-`sigen-home-bridge` runs on any box on your network that can run Docker (e.g. a NAS, Raspberry Pi, etc), reads the gateway directly every few seconds, and surfaces it three ways:
+`sigen-home-bridge` is one of those readers, aimed at putting the data on the screens you already use. It runs on any box on your network that can run Docker (a NAS, a Raspberry Pi, etc), reads the gateway directly every few seconds, and surfaces the readings three ways:
 
 - **Web dashboard**: a multi-panel live view plus a scrubbable history chart, responsively resizable for a wall-mounted tablet or spare phone, installable as a home-screen app.
 - **Apple Home**: live readings on your iPhone, iPad, and HomePod, usable in automations.
@@ -72,9 +72,6 @@ Your Sigenergy inverter tracks solar production, battery charge, grid import/exp
 - ❌ **A Home Assistant integration:** it's a standalone service. If you already run Home Assistant, you may prefer its Sigenergy Modbus integrations instead.
 - ❌ **A long-term energy historian:** the trends chart reaches back over your retention window (default 7 days, up to 90), not years. For long-term statistics and billing-grade data, pair it with something purpose-built.
 - ❌ **Authenticated:** designed for a trusted home LAN. There's no login, so don't expose the dashboard to the internet (see [Security](#security)).
-
-> [!IMPORTANT]<br>
-> `sigen-home-bridge` was built and tested against the author's personal Sigenergy system: a single SigenStor inverter with rooftop solar and a battery, no EV charger or generator. Beyond the plant-level totals every system reports, the bridge will try to read setups it hasn't yet been tested against e.g. more than one inverter, AC-coupled third-party PV, etc. Those follow Sigenergy's published Modbus map but are unverified on other hardware, and some device types (EV chargers, generators, vehicle-to-home) aren't read yet. If a reading looks wrong on your system, flag it in [Discussions](https://github.com/furey/sigen-home-bridge/discussions).
 
 ## Features
 
@@ -464,6 +461,9 @@ This project:
 - Reads from your system over Modbus TCP but never writes to it.
 - Is written with the assistance of AI and may contain errors.
 - Is provided as-is with no warranty; use at your own risk.
+
+> [!IMPORTANT]<br>
+> `sigen-home-bridge` was built and tested against the author's personal Sigenergy system: a single SigenStor inverter with rooftop solar and a battery, no EV charger or generator. Beyond the plant-level totals every system reports, the bridge will try to read setups it hasn't yet been tested against e.g. more than one inverter, AC-coupled third-party PV, etc. Those follow Sigenergy's published Modbus map but are unverified on other hardware, and some device types (EV chargers, generators, vehicle-to-home) aren't read yet. If a reading looks wrong on your system, flag it in [Discussions](https://github.com/furey/sigen-home-bridge/discussions).
 
 ## Contributing
 
