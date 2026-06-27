@@ -1,7 +1,7 @@
 <h1 align="center">sigen-home-bridge</h1>
 
 <p align="center">
-  <strong>Live Sigenergy solar and battery readings in Apple Home, Google Home, and web dashboard.</strong><br/>
+  <strong>Your live Sigenergy data via local dashboard, Apple Home, and Google Home.</strong><br/>
   A self-hosted bridge that reads your system directly over your home network.<br/>
   No cloud account or Home Assistant required.
 </p>
@@ -43,11 +43,13 @@
 
 ## What `sigen-home-bridge` is
 
-Your Sigenergy gateway exposes its live readings locally over Modbus TCP, not just through the cloud [mySigen app](https://www.sigenergy.com/en/products/mysigen-app), so anything on your LAN can read them: Home Assistant, another project, or a script of your own. `sigen-home-bridge` is one such reader, built to put the data on screens you already use. It runs in Docker on any box on your network (a NAS, a Raspberry Pi, etc), polls the gateway every few seconds, and surfaces the readings three ways:
+`sigen-home-bridge` reads your Sigenergy gateway over Modbus TCP and surfaces its data multiple ways:
 
 - **Web dashboard**: a multi-panel live view plus a scrubbable history chart, responsively resizable for a wall-mounted tablet or spare phone, installable as a home-screen app.
 - **Apple Home**: live readings on your iPhone, iPad, and HomePod, usable in automations.
 - **Google Home**: sensor support via a free Cloudflare Tunnel.
+- **Webhooks**: build alerts on any reading and fire them to a JSON endpoint (ntfy, Pushover, Home Assistant, Discord, etc).
+- **JSON feed**: every reading on one live `/api/snapshot` endpoint to poll into your own scripts, spreadsheets, Node-RED, or aggregator.
 
 <p align="center">
   <img src="docs/screenshots/dashboard-desktop.png" alt="Dashboard" width="100%"/>
