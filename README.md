@@ -105,27 +105,7 @@ In the mySigen iOS app (as of June 2026): **Settings → System Settings → Gen
 > [!NOTE]<br>
 > If the option is missing, your account may need installer-level access; ask your installer to enable it.
 
-> [!WARNING]<br>
-> The IP address the app reveals is the gateway's *internally-reported* address and is usually not its address on your LAN (it's often on a different subnet entirely). Don't use it; find the real one in step 2.
-
-### 2. Find your gateway's IP
-
-The setup wizard does this for you: the **Scan** button on its gateway field sweeps your LAN for the open Modbus port and verifies each answer with a real register read, so you can usually skip straight to step 3.
-
-<p align="center">
-  <img src="docs/screenshots/wizard-gateway.png" alt="Wizard → Gateway" width="560"/>
-  <br/><em>Wizard → Gateway</em>
-</p>
-
-To find the address yourself instead, scan with nmap (substitute your LAN's subnet):
-
-```bash
-nmap -Pn -p 502 192.168.1.0/24
-```
-
-The host showing `502/tcp open` (not `filtered`) is your gateway. Either way, give it a static DHCP lease on your router so the address never changes.
-
-### 3. Deploy
+### 2. Deploy
 
 ```bash
 git clone https://github.com/furey/sigen-home-bridge
@@ -134,16 +114,27 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-You can set `SIGEN_IP` in `.env` first, or just leave it; the setup wizard can scan your LAN to detect it, then verify the connection before you continue.
-
 > [!NOTE]<br>
 > The container runs with `network_mode: host` because Apple Home discovery (Bonjour/mDNS) doesn't traverse Docker's bridge network. On a host with extra Docker networks (typical on a NAS), also set `HOMEKIT_BIND=eth0` (your LAN interface) in `.env` (see [Troubleshooting](#troubleshooting)).
 
-### 4. Open the dashboard
+### 3. Open the dashboard
 
-Browse to `http://<host-ip>:5163`. On first run a short setup wizard walks you through pointing the bridge at your gateway (auto-detecting it with the **Scan** button, plus **Test connection**), choosing a poll cadence, and optionally configuring weather, HomeKit and Google Home. Only the gateway step is required.
+Browse to `http://<host-ip>:5163`. On first run a short setup wizard walks you through pointing the bridge at your gateway: the **Scan** button sweeps your LAN for the open Modbus port and verifies each hit with a real register read, then **Test connection** confirms it before you continue. From there you set a poll cadence and optionally configure weather, Apple Home, and Google Home. Only the gateway step is required.
 
-### 5. Pair Apple Home (optional)
+<p align="center">
+  <img src="docs/screenshots/wizard-gateway.png" alt="Wizard → Gateway" width="560"/>
+  <br/><em>Wizard → Gateway</em>
+</p>
+
+If **Scan** can't find the gateway, set its address yourself. Don't use the IP shown in the mySigen app; that's the gateway's *internally-reported* address and is usually on a different subnet from your LAN. Find the real one with nmap (substitute your subnet):
+
+```bash
+nmap -Pn -p 502 192.168.1.0/24
+```
+
+The host showing `502/tcp open` (not `filtered`) is your gateway. Enter it in the wizard, or set `SIGEN_IP` in `.env` before deploying. Either way, give the gateway a static DHCP lease on your router so the address never changes.
+
+### 4. Pair Apple Home (optional)
 
 The bridge prints a pairing QR code and PIN to its log on startup:
 
@@ -156,7 +147,7 @@ docker logs sigen-home-bridge
 
 In the Home app: **Add Accessory**, then scan the QR (or choose **More Options** to type the PIN, default `516-35-163`). The bridge isn't Apple-certified, so the Home app flags it as an uncertified accessory; tap **Add Anyway** to continue. Pairing survives restarts and upgrades.
 
-### 6. Save it as an app (optional)
+### 5. Save it as an app (optional)
 
 The dashboard installs as a home-screen app on any iPhone or iPad: open it in Safari, then **Share → Add to Home Screen**. It gets its own icon and launches fullscreen (no address bar or Safari chrome); this is also the easiest way to set up a spare phone or tablet as a permanent wall display. Android works the same way via Chrome's **Add to Home screen**.
 
@@ -409,7 +400,7 @@ Architecture diagrams, the Modbus register map, the poller state machine, settin
 
 **The bridge can't connect to the gateway**
 
-- Make sure you used the IP from a scan, not the one shown in the mySigen app (see [Quick start step 2](#2-find-your-gateways-ip)).
+- Make sure you used the IP from a scan, not the one shown in the mySigen app (see [Quick start step 3](#3-open-the-dashboard)).
 - Confirm Modbus TCP is still toggled on in mySigen, and the unit ID is `247` (the default).
 - Use the **Scan** and **Test connection** buttons in **Settings → Gateway** to check from the bridge's point of view.
 - Verify the gateway didn't change address; set a static DHCP lease if you haven't.
