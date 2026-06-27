@@ -151,7 +151,7 @@ In the Home app: **Add Accessory**, then scan the QR (or choose **More Options**
 
 The dashboard installs as a home-screen app on any iPhone or iPad: open it in Safari, then **Share → Add to Home Screen**. It gets its own icon and launches fullscreen (no address bar or Safari chrome); this is also the easiest way to set up a spare phone or tablet as a permanent wall display. Android works the same way via Chrome's **Add to Home screen**.
 
-Settings (the gear icon) lets you change everything later (polling schedules, battery capacity and reserve, power units, alerts, tariffs, themes, weather, HomeKit, Google Home, etc) with no `.env` editing and, for most changes, no restart.
+Settings (the gear icon) lets you change everything later (polling schedules, battery capacity, reserve and charge display (% or kWh), power units, alerts, tariffs, themes, weather, HomeKit, Google Home, etc) with no `.env` editing and, for most changes, no restart.
 
 <p align="center">
   <img src="docs/screenshots/settings-connection.png" alt="Settings → Gateway" width="100%"/>
