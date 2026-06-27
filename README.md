@@ -43,9 +43,7 @@
 
 ## What `sigen-home-bridge` is
 
-Your Sigenergy inverter tracks solar production, battery charge, grid import/export, and home consumption. The mySigen app shows those numbers, but it routes through Sigenergy's cloud. The gateway also exposes them locally over Modbus TCP, so anything on your network can read them directly: Home Assistant, other open-source projects, or a script you write yourself.
-
-`sigen-home-bridge` is one of those readers, aimed at putting the data on the screens you already use. It runs on any box on your network that can run Docker (a NAS, a Raspberry Pi, etc), reads the gateway directly every few seconds, and surfaces the readings three ways:
+Your Sigenergy gateway exposes its live readings locally over Modbus TCP, not just through the cloud [mySigen app](https://www.sigenergy.com/en/products/mysigen-app), so anything on your LAN can read them: Home Assistant, another project, or a script of your own. `sigen-home-bridge` is one such reader, built to put the data on screens you already use. It runs in Docker on any box on your network (a NAS, a Raspberry Pi, etc), polls the gateway every few seconds, and surfaces the readings three ways:
 
 - **Web dashboard**: a multi-panel live view plus a scrubbable history chart, responsively resizable for a wall-mounted tablet or spare phone, installable as a home-screen app.
 - **Apple Home**: live readings on your iPhone, iPad, and HomePod, usable in automations.
@@ -77,8 +75,8 @@ Your Sigenergy inverter tracks solar production, battery charge, grid import/exp
 
 - **Live readings**: solar, battery power and charge level, grid import/export, and home consumption, polled directly over Modbus TCP.
 - **Battery estimates**: after a few minutes of steady charge or discharge, the dashboard shows time to full or empty, with the projected clock time under the charge bar.
-- **First-run wizard**: open the dashboard and automatically wire it up to your gateway. Every setting is editable in the UI afterwards (`.env` is optional).
 - **Apple Home accessories**: Sensors usable in automations and visible at a glance, paired with a QR code and advertised locally via Bonjour.
+- **Google Home sensors**: battery and power readings in the Google Home app, reached through a free Cloudflare Tunnel, with per-device names and watt/kW display modes.
 - **Wall-display dashboard**: fullscreen per-metric readouts, adaptive layouts from desktop to phone, and per-view URLs (`/trends`, `/metric/solar`, …) so a kiosk can point straight at one screen.
 - **Trends chart**: every metric on one time axis with a day/night sky backdrop and sunrise/sunset markers; scrub with mouse or touch, solo a line, and pick a window from the last minute up to your full retention span. Step back and forth through earlier history with the on-chart controls or the arrow keys. History persists across restarts in a local SQLite store, with a retention window you set and CSV/JSON export under **Settings → History**.
 - **Per-device breakdown**: Device Breakdown page lists multiple inverters behind plant totals (model, status, solar, active power, temperature, charge, health, and every PV string), reachable via optional dashboard button.
@@ -90,6 +88,7 @@ Your Sigenergy inverter tracks solar production, battery charge, grid import/exp
 - **Connection-loss handling**: if the gateway drops, the bridge keeps serving the last known values, shows itself offline, and reconnects automatically.
 - **Single Docker container**: state (pairing, settings, history) persists in one volume; survives restarts and upgrades.
 - **Settings passcode**: optionally lock the settings behind a PIN (**Settings → Security**), so a guest on your network can watch the dashboard without corrupting your settings (enforced server-side).
+- **First-run wizard**: open the dashboard and it walks you through pointing the bridge at your gateway. Every setting is editable in the UI afterwards (`.env` is optional).
 
 ## Prerequisites
 
