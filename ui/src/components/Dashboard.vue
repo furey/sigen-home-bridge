@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ChartSpline, Cpu, Settings, Thermometer } from '@lucide/vue'
 import { useStateStream } from '../composables/useStateStream.js'
 import { useBatteryEstimate } from '../composables/useBatteryEstimate.js'
+import { useBatteryCharge } from '../composables/useBatteryCharge.js'
 import { useDashboardView } from '../composables/useDashboardView.js'
 import { useSettings } from '../composables/useSettings.js'
 import { useHoverCapable } from '../composables/useHoverCapable.js'
@@ -68,7 +69,7 @@ const labelOf = (metric) => directionFor(metric, state[metric.key] ?? 0)
 const flowIconOf = (metric) => flowIconFor(metric, state[metric.key] ?? 0)
 const flowColorOf = (metric) => flowAccentFor(metric, state[metric.key] ?? 0)
 
-const socValue = computed(() => Math.round(state.batterySoc ?? 0))
+const charge = useBatteryCharge()
 const socColor = computed(() => accentFor(soc, state.batterySoc ?? 0))
 const socWidth = computed(() => `${Math.max(0, Math.min(100, state.batterySoc ?? 0))}%`)
 const socIcon = computed(() => iconFor(soc, state))
@@ -226,9 +227,9 @@ const lastUpdated = computed(() =>
                 :class="{ 'opacity-30': dimmed('battery-left') }"
               >
                 <span class="text-4xl font-semibold metric-value tabular-nums sm:text-5xl" :style="{ color: socColor }">
-                  {{ socValue }}
+                  {{ charge.value }}
                 </span>
-                <span class="text-sm metric-unit text-zinc-500">%</span>
+                <span class="text-sm metric-unit text-zinc-500">{{ charge.unit }}</span>
               </div>
               <div
                 class="flex items-baseline gap-1 transition-opacity"

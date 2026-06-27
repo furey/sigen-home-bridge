@@ -87,7 +87,7 @@ const defaults = () => ({
   security: defaultSecurity()
 })
 
-const defaultBattery = () => ({ capacityKwh: null, reserveSoc: 0 })
+const defaultBattery = () => ({ capacityKwh: null, reserveSoc: 0, chargeUnit: 'percent' })
 
 const defaultSecurity = () => ({ passcode: null })
 
@@ -279,10 +279,13 @@ const validStoredPasscode = (value) => {
 
 const isHex = (value) => typeof value === 'string' && /^[0-9a-f]+$/i.test(value)
 
-const validBattery = ({ capacityKwh, reserveSoc }) => ({
+const validBattery = ({ capacityKwh, reserveSoc, chargeUnit }) => ({
   capacityKwh: validCapacity(capacityKwh),
-  reserveSoc: validReserveSoc(reserveSoc)
+  reserveSoc: validReserveSoc(reserveSoc),
+  chargeUnit: validEnum(chargeUnit, BATTERY_CHARGE_UNITS, 'percent', 'battery charge unit')
 })
+
+const BATTERY_CHARGE_UNITS = ['percent', 'energy']
 
 const validCapacity = (value) => {
   if (value === null || value === undefined || value === '') return null

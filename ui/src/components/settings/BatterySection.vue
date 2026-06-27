@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import { Activity, BatteryFull, BatteryLow, LoaderCircle, ScanSearch } from '@lucide/vue'
+import { Activity, BatteryFull, BatteryLow, LoaderCircle, Percent, ScanSearch } from '@lucide/vue'
 import InfoTip from '../InfoTip.vue'
 import { useSettings } from '../../composables/useSettings.js'
 import { useSettingsSection } from '../../composables/useSettingsSection.js'
@@ -12,7 +12,7 @@ import UnsavedDialog from './UnsavedDialog.vue'
 const { data, loadOnce } = useSettings()
 const { state } = useStateStream()
 
-const form = reactive({ capacityKwh: '', reserveSoc: 0 })
+const form = reactive({ capacityKwh: '', reserveSoc: 0, chargeUnit: 'percent' })
 
 const RESERVE_MIN = 0
 const RESERVE_MAX = 99
@@ -26,6 +26,7 @@ onMounted(async () => {
   await loadOnce()
   form.capacityKwh = data.battery.capacityKwh ?? ''
   form.reserveSoc = data.battery.reserveSoc
+  form.chargeUnit = data.battery.chargeUnit
   markPristine()
 })
 
@@ -61,11 +62,13 @@ const formatKwh = (kwh) => {
 }
 
 function snapshot() {
-  return { capacityKwh: capacity(), reserveSoc: Number(form.reserveSoc) }
+  return { capacityKwh: capacity(), reserveSoc: Number(form.reserveSoc), chargeUnit: form.chargeUnit }
 }
 
 function buildPatch() {
-  return { battery: { capacityKwh: capacity(), reserveSoc: Number(form.reserveSoc) } }
+  return {
+    battery: { capacityKwh: capacity(), reserveSoc: Number(form.reserveSoc), chargeUnit: form.chargeUnit }
+  }
 }
 </script>
 
@@ -97,9 +100,23 @@ function buildPatch() {
   </section>
 
   <section class="p-5 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800">
+    <div class="flex items-center gap-2 mb-3 text-sm text-zinc-400">
+      <Percent class="w-4 h-4" />Charge readout
+    </div>
+    <p class="mb-3 text-xs text-zinc-500">
+      How the battery's charge appears on the dashboard tile and its fullscreen view. Energy needs a
+      usable capacity above; without one it stays a percentage.
+    </p>
+    <select v-model="form.chargeUnit" class="w-full px-3 py-2 rounded-lg bg-zinc-800">
+      <option value="percent">Percentage (%)</option>
+      <option value="energy">Energy (kWh)</option>
+    </select>
+  </section>
+
+  <section class="p-5 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800">
     <div class="flex items-center justify-between mb-3">
       <div class="flex items-center gap-2 text-sm text-zinc-400">
-        <BatteryLow class="w-4 h-4" />Reserve charge
+        <BatteryLow class="w-4 h-4" />Reserve charge<InfoTip topic="reserveCharge" />
       </div>
       <span class="text-sm text-zinc-300 tabular-nums">{{ form.reserveSoc }}%</span>
     </div>

@@ -79,6 +79,14 @@ export const HELP = {
       { p: 'To pin an exact spot, right-click a location in Google Maps: the first number is latitude, the second is longitude.' }
     ]
   },
+  reserveCharge: {
+    title: 'Reserve charge',
+    body: [
+      { p: 'A floor for the battery: the charge it stops discharging at, holding the rest back rather than running down to empty. Leave it at **0** to count all the way down.' },
+      { p: 'Why keep some in reserve? To have a cushion if the grid drops (a backup-equipped Sigen system can run the house off the battery, but only while there’s charge left), to avoid waking up to a flat battery, or simply to cycle the cells less deeply.' },
+      { p: 'This number is for the bridge’s estimate, not the hardware. It doesn’t tell the battery what to do; you set the real reserve in the mySigen app. Match it here so the tile’s “Reserve in 3h…” countdown and the reaches-reserve alert line up with what the system actually does.' }
+    ]
+  },
   energyStats: {
     title: 'Energy statistics',
     body: [

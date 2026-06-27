@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { ArrowLeft, RefreshCw } from '@lucide/vue'
 import { useStateStream } from '../composables/useStateStream.js'
 import { useMetricView } from '../composables/useMetricView.js'
+import { useBatteryCharge } from '../composables/useBatteryCharge.js'
 import { useHoverCapable } from '../composables/useHoverCapable.js'
 import { accentFor, directionFor, flowAccentFor, flowIconFor, iconFor, metricByKey } from '../lib/metrics.js'
 import BrandMark from './BrandMark.vue'
@@ -14,11 +15,14 @@ const props = defineProps({
 
 const { state } = useStateStream()
 const { viewFor, advance } = useMetricView()
+const batteryCharge = useBatteryCharge()
 const router = useRouter()
 
 const metric = computed(() => metricByKey(props.metricKey))
 const raw = computed(() => state[props.metricKey] ?? 0)
-const value = computed(() => metric.value.format(raw.value))
+const isSoc = computed(() => props.metricKey === 'batterySoc')
+const value = computed(() => (isSoc.value ? batteryCharge.value.value : metric.value.format(raw.value)))
+const unitLabel = computed(() => (isSoc.value ? batteryCharge.value.unit : metric.value.unit))
 const displayIcon = computed(() => iconFor(metric.value, state))
 const glyphFlowIcon = computed(() => flowIconFor(metric.value, raw.value))
 const glyphIcon = computed(() => glyphFlowIcon.value ?? displayIcon.value)
@@ -29,7 +33,8 @@ const glyphIconStyle = computed(() =>
   glyphFlowIcon.value ? { color: flowAccentFor(metric.value, raw.value) } : null)
 const color = computed(() => accentFor(metric.value, raw.value))
 const direction = computed(() => directionFor(metric.value, raw.value))
-const isPercent = computed(() => metric.value.unit === '%')
+const isPercent = computed(() =>
+  (isSoc.value ? batteryCharge.value.isPercent : metric.value.unit === '%'))
 const socWidth = computed(() =>
   props.metricKey === 'batterySoc'
     ? `${Math.max(0, Math.min(100, raw.value))}%`
@@ -127,7 +132,7 @@ const VIEW_COUNT = 2
           <span class="flex items-baseline leading-none">
             <span class="text-[calc(var(--mu)*16)] font-semibold tracking-tight">{{ value }}</span>
             <span v-if="!isPercent" class="ml-[calc(var(--mu)*0.5)] text-[calc(var(--mu)*4.5)] font-medium text-zinc-500">
-              {{ metric.unit }}
+              {{ unitLabel }}
             </span>
           </span>
         </div>
@@ -145,10 +150,10 @@ const VIEW_COUNT = 2
               v-if="isPercent"
               class="ml-[calc(var(--mu)*0.5)] text-[calc(var(--mu)*5.5)] font-medium text-zinc-500"
             >
-              {{ metric.unit }}
+              {{ unitLabel }}
             </span>
           </p>
-          <p v-if="!isPercent" class="text-2xl text-zinc-500">{{ metric.unit }}</p>
+          <p v-if="!isPercent" class="text-2xl text-zinc-500">{{ unitLabel }}</p>
           <div v-if="socWidth" class="mt-2 h-3 w-2/3 max-w-xl rounded-full bg-zinc-800">
             <div
               class="h-3 rounded-full transition-all"

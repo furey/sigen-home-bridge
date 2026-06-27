@@ -200,7 +200,7 @@ const data = reactive({
   sigen: { host: '', port: 502, unitId: 247 },
   poll: { defaultIntervalMs: 5000, reconnectDelayMs: 10000, schedule: [] },
   weather: { enabled: true, latitude: null, longitude: null, units: 'celsius', refreshMs: 600000 },
-  battery: { capacityKwh: null, reserveSoc: 0 },
+  battery: { capacityKwh: null, reserveSoc: 0, chargeUnit: 'percent' },
   history: { retentionDays: 7 },
   alerts: { items: [] },
   tariff: {

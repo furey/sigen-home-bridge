@@ -66,6 +66,16 @@ describe('battery', () => {
     const { battery } = loadSettings()
     expect(battery.capacityKwh).toBeNull()
     expect(battery.reserveSoc).toBe(0)
+    expect(battery.chargeUnit).toBe('percent')
+  })
+
+  it('persists the charge readout unit', () => {
+    const { battery } = updateSettings({ battery: { chargeUnit: 'energy' } })
+    expect(battery.chargeUnit).toBe('energy')
+  })
+
+  it('rejects an unknown charge readout unit', () => {
+    expect(() => updateSettings({ battery: { chargeUnit: 'kwh' } })).toThrow(/charge unit/)
   })
 
   it('persists capacity and reserve', () => {
