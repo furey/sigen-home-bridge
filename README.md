@@ -153,6 +153,11 @@ The dashboard installs as a home-screen app on any iPhone or iPad: open it in Sa
 
 Settings (the gear icon) lets you change everything later (polling schedules, battery capacity and reserve, power units, alerts, tariffs, themes, weather, HomeKit, Google Home, etc) with no `.env` editing and, for most changes, no restart.
 
+<p align="center">
+  <img src="docs/screenshots/settings-connection.png" alt="Settings → Gateway" width="100%"/>
+  <br/><em>Settings → Gateway</em>
+</p>
+
 ## Configuration
 
 Most setups need no `.env` at all: everything is configurable in the dashboard's settings UI, saved server-side, and applied live in most cases. The `.env` file only seeds the first boot; the handful of values you might actually set there:
@@ -166,11 +171,6 @@ Most setups need no `.env` at all: everything is configurable in the dashboard's
 | `SERVER_PORT`  | `5163`             | If 5163 clashes with something else                            |
 
 The full variable reference, the settings-precedence rules, and the schedule syntax are in [`docs/DEEP_DIVE.md`](docs/DEEP_DIVE.md#full-configuration-reference).
-
-<p align="center">
-  <img src="docs/screenshots/settings-connection.png" alt="Settings → Gateway" width="100%"/>
-  <br/><em>Settings → Gateway</em>
-</p>
 
 Bridge state (HomeKit pairing, saved settings, chart history, etc) lives in a named Docker volume (`sigen-data`) that survives restarts, rebuilds, and `docker compose down`. Only `down -v` wipes it. To keep state in a host folder you can browse instead, swap `sigen-data:/data` for a bind mount like `./data:/data` in `compose.yaml`.
 
