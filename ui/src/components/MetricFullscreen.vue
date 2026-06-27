@@ -35,6 +35,7 @@ const color = computed(() => accentFor(metric.value, raw.value))
 const direction = computed(() => directionFor(metric.value, raw.value))
 const isPercent = computed(() =>
   (isSoc.value ? batteryCharge.value.isPercent : metric.value.unit === '%'))
+const unitBesideValue = computed(() => isPercent.value || isSoc.value)
 const socWidth = computed(() =>
   props.metricKey === 'batterySoc'
     ? `${Math.max(0, Math.min(100, raw.value))}%`
@@ -147,13 +148,13 @@ const VIEW_COUNT = 2
           <p class="my-4 flex items-baseline leading-none tabular-nums" :style="{ color }">
             <span class="text-[calc(var(--mu)*20)] font-semibold tracking-tight">{{ value }}</span>
             <span
-              v-if="isPercent"
+              v-if="unitBesideValue"
               class="ml-[calc(var(--mu)*0.5)] text-[calc(var(--mu)*5.5)] font-medium text-zinc-500"
             >
               {{ unitLabel }}
             </span>
           </p>
-          <p v-if="!isPercent" class="text-2xl text-zinc-500">{{ unitLabel }}</p>
+          <p v-if="!unitBesideValue" class="text-2xl text-zinc-500">{{ unitLabel }}</p>
           <div v-if="socWidth" class="mt-2 h-3 w-2/3 max-w-xl rounded-full bg-zinc-800">
             <div
               class="h-3 rounded-full transition-all"
