@@ -338,7 +338,8 @@ const lastUpdated = computed(() =>
     <footer class="grid grid-cols-[1fr_auto_1fr] items-center text-sm text-zinc-500">
       <div>
         <button
-          class="flex items-center gap-2 transition text-zinc-500 hover:text-zinc-300"
+          class="flex items-center gap-2 transition"
+          :class="trendsActive ? 'text-zinc-50' : 'text-zinc-500 hover:text-zinc-300'"
           role="switch"
           :aria-checked="trendsActive"
           aria-label="Toggle trends view"
