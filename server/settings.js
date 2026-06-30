@@ -18,18 +18,34 @@ export const loadSettings = () => {
 
 export const getSettings = () => current ?? loadSettings()
 
-export const publicSettings = () => {
-  const { google, security, ...rest } = getSettings()
-  return {
-    ...rest,
-    google: { labels: google.labels, powerUnit: google.powerUnit, batteryDisplay: google.batteryDisplay },
-    googleAuthTokenSet: Boolean(google.authToken),
-    security: { passcodeSet: Boolean(security.passcode) },
-    homekitMetrics: HOMEKIT_METRICS,
-    googleMetrics: GOOGLE_METRICS,
-    alertTriggers: serializeTriggers(triggerCapabilities())
-  }
+export const publicSettings = ({ authenticated = false } = {}) => {
+  const settings = getSettings()
+  const exposed = exposeSettings(settings)
+  const locked = Boolean(settings.security.passcode) && !authenticated
+  return locked ? redactSecrets(exposed) : exposed
 }
+
+const exposeSettings = ({ google, security, ...rest }) => ({
+  ...rest,
+  google: { labels: google.labels, powerUnit: google.powerUnit, batteryDisplay: google.batteryDisplay },
+  googleAuthTokenSet: Boolean(google.authToken),
+  security: { passcodeSet: Boolean(security.passcode) },
+  homekitMetrics: HOMEKIT_METRICS,
+  googleMetrics: GOOGLE_METRICS,
+  alertTriggers: serializeTriggers(triggerCapabilities())
+})
+
+const redactSecrets = (settings) => ({
+  ...settings,
+  sigen: { ...settings.sigen, host: '' },
+  homekit: { ...settings.homekit, pin: '' },
+  alerts: { ...settings.alerts, items: (settings.alerts?.items ?? []).map(redactWebhookUrl) }
+})
+
+const redactWebhookUrl = (item) => ({
+  ...item,
+  channels: { ...item.channels, webhook: { ...item.channels?.webhook, url: '' } }
+})
 
 const triggerCapabilities = () => ({
   weatherEnabled: getSettings().weather.enabled,

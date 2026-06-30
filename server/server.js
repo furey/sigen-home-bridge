@@ -13,7 +13,10 @@ import { testWeather } from './weather.js'
 import { testAlert } from './alerts.js'
 import { getPairing } from './homekit.js'
 import { handleIntent } from './google.js'
-import { requirePasscode, unlock, lock, sessionStatus, setPasscode, clearPasscode } from './security.js'
+import {
+  requirePasscode, requireGoogleToken, isAuthenticated,
+  unlock, lock, sessionStatus, setPasscode, clearPasscode
+} from './security.js'
 
 const uiDist = fileURLToPath(new URL('../ui/dist', import.meta.url))
 
@@ -28,20 +31,22 @@ export const startHttpServer = () => {
   app.get('/api/history/nearest', (request, response) =>
     response.json(nearestSample(nearestQuery(request.query))))
   app.get('/api/history/export', exportHistory)
-  app.get('/api/settings', (request, response) => response.json(publicSettings()))
+  app.get('/api/settings', (request, response) =>
+    response.json(publicSettings({ authenticated: isAuthenticated(request) })))
   app.put('/api/settings', requirePasscode, saveSettings)
-  app.post('/api/settings/reset', requirePasscode, (request, response) => response.json(resetSettings() && publicSettings()))
+  app.post('/api/settings/reset', requirePasscode, (request, response) =>
+    response.json(resetSettings() && publicSettings({ authenticated: true })))
   app.get('/api/session', sessionStatus)
   app.post('/api/unlock', unlock)
   app.post('/api/lock', lock)
   app.post('/api/security/passcode', requirePasscode, setPasscode)
   app.delete('/api/security/passcode', requirePasscode, clearPasscode)
-  app.post('/api/test/gateway', testGatewayHandler)
-  app.post('/api/discover/gateway', discoverGatewayHandler)
-  app.post('/api/test/weather', testWeatherHandler)
-  app.post('/api/test/alert', testAlertHandler)
-  app.get('/api/homekit/pairing', (request, response) => response.json(getPairing()))
-  app.post('/fulfillment', (request, response) => response.json(handleIntent(request.body)))
+  app.post('/api/test/gateway', requirePasscode, testGatewayHandler)
+  app.post('/api/discover/gateway', requirePasscode, discoverGatewayHandler)
+  app.post('/api/test/weather', requirePasscode, testWeatherHandler)
+  app.post('/api/test/alert', requirePasscode, testAlertHandler)
+  app.get('/api/homekit/pairing', requirePasscode, (request, response) => response.json(getPairing()))
+  app.post('/fulfillment', requireGoogleToken, (request, response) => response.json(handleIntent(request.body)))
   app.get('/auth', stubAuth)
   app.post('/token', stubToken)
   app.use(express.static(uiDist, { setHeaders: setStaticCacheHeaders }))
@@ -101,7 +106,7 @@ const streamEvents = (request, response) => {
 const saveSettings = (request, response) => {
   try {
     updateSettings(request.body)
-    response.json(publicSettings())
+    response.json(publicSettings({ authenticated: true }))
   } catch (error) {
     response.status(error.status ?? 400).json({ error: error.message })
   }

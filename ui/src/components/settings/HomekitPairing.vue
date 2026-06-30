@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { Check, Copy } from '@lucide/vue'
+import { useSession } from '../../composables/useSession.js'
 
 const props = defineProps({ pin: { type: String, default: '' } })
 
@@ -15,7 +16,9 @@ const unsaved = computed(() =>
 
 onMounted(async () => {
   try {
-    pairing.value = await (await fetch('/api/homekit/pairing')).json()
+    pairing.value = await (await fetch('/api/homekit/pairing', {
+      headers: useSession().authHeaders()
+    })).json()
   } catch {
     pairing.value = { uri: '', pin: '', qr: '' }
   }

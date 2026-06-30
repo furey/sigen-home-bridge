@@ -28,10 +28,15 @@ export const lock = (request, response) => {
 }
 
 export const sessionStatus = (request, response) =>
-  response.json({
-    passcodeSet: passcodeSet(),
-    authenticated: !passcodeSet() || validToken(bearerToken(request))
-  })
+  response.json({ passcodeSet: passcodeSet(), authenticated: isAuthenticated(request) })
+
+export const isAuthenticated = (request) => !passcodeSet() || validToken(bearerToken(request))
+
+export const requireGoogleToken = (request, response, next) => {
+  const expected = getSettings().google.authToken
+  if (!expected || tokensMatch(bearerToken(request), expected)) return next()
+  return response.status(401).json({ error: 'Unauthorized' })
+}
 
 export const setPasscode = (request, response) => {
   const passcode = String(request.body?.passcode ?? '')
@@ -75,6 +80,12 @@ const isNumericPin = (value) => new RegExp(`^\\d{${PIN_LENGTH}}$`).test(value)
 const bearerToken = (request) => {
   const [scheme, token] = (request.headers.authorization ?? '').split(' ')
   return scheme === 'Bearer' && token ? token : ''
+}
+
+const tokensMatch = (provided, expected) => {
+  const left = Buffer.from(String(provided))
+  const right = Buffer.from(String(expected))
+  return left.length === right.length && timingSafeEqual(left, right)
 }
 
 const openSession = () => {

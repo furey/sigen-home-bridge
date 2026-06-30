@@ -45,7 +45,7 @@
 
 `sigen-home-bridge` reads your Sigenergy gateway over Modbus TCP and surfaces its data multiple ways:
 
-- **Web dashboard**: a multi-panel live view plus a scrubbable history chart, responsively resizable for a wall-mounted tablet or spare phone, installable as a home-screen app.
+- **Web dashboard**: a multi-panel live view plus a scrubbable history chart, responsively resizable for a wall-mounted tablet or spare phone, installable as a home-screen app, and reachable from anywhere when you front the bundled Cloudflare Tunnel with Cloudflare Access (a login wall at Cloudflare's edge, no VPN).
 - **Apple Home**: live readings on your iPhone, iPad, and HomePod, usable in automations.
 - **Google Home**: sensor support via a free Cloudflare Tunnel.
 - **Webhooks**: build alerts on any reading and fire them to a JSON endpoint (ntfy, Pushover, Home Assistant, Discord, etc).
@@ -71,7 +71,7 @@
 - ❌ **A controller:** the bridge is read-only. It never writes to your Sigenergy system, so it can't change charge modes, schedules, or settings.
 - ❌ **A Home Assistant integration:** it's a standalone service. If you already run Home Assistant, you may prefer its Sigenergy Modbus integrations instead.
 - ❌ **A long-term energy historian:** the trends chart reaches back over your retention window (default 7 days, up to 90), not years. For long-term statistics and billing-grade data, pair it with something purpose-built.
-- ❌ **Authenticated:** designed for a trusted home LAN. There's no login, so don't expose the dashboard to the internet (see [Security](#security)).
+- ❌ **Authenticated on its own:** there's no built-in login, so on your LAN it's open by design. Reach it from outside by fronting the tunnel with Cloudflare Access rather than port-forwarding the raw app (see [Security](#security)).
 
 ## Features
 
@@ -205,7 +205,7 @@ You set all of it from **Settings → Apple Home**: the pairing QR and code, the
 
 Google Home support is best-effort: Google's smart-home integrations are cloud-to-cloud, so its servers call a public HTTPS endpoint rather than reaching the bridge on your LAN. That means more setup than Apple Home (a tunnel to expose the fulfillment endpoint) and Google renders the readings less cleanly. To get it working:
 
-1. Create a free Cloudflare Tunnel routing a hostname to `http://localhost:5163`, put the token in `CLOUDFLARE_TUNNEL_TOKEN`, and start the bundled sidecar: `docker compose --profile tunnel up -d`.
+1. Create a free Cloudflare Tunnel routing a public hostname to `http://localhost:5163`, put the token in `CLOUDFLARE_TUNNEL_TOKEN`, and start the bundled sidecar: `docker compose --profile tunnel up -d`. The hostname has to sit on a domain you've added to your Cloudflare account (any domain on the free plan; the throwaway `*.trycloudflare.com` quick tunnels won't do, since Google needs a stable fulfillment URL). See [`docs/DEEP_DIVE.md`](docs/DEEP_DIVE.md#cloudflare-tunnel) for the why and the transport caveats.
 2. In the [Google Home Developer Console](https://console.home.google.com), create a cloud-to-cloud project. Set the fulfillment URL to `https://<your-tunnel-host>/fulfillment` and the OAuth Authorization and Token URLs to `/auth` and `/token` on the same host. Client ID and secret can be any non-empty values; the bundled stub OAuth ignores them.
 3. Set the Auth token in **Settings → Google Home** to any value (the shared bearer the stub returns), then link the project in the Google Home app.
 
@@ -388,8 +388,8 @@ For history, `GET /api/history` returns the recent samples behind the trends cha
 
 The dashboard and its read APIs have no authentication; anyone who can reach the port can view your readings. What you can lock is changing things: set a passcode under **Settings → Security** and the settings API rejects every change that doesn't carry a valid session token, so a guest on your LAN can watch the dashboard but can't edit your settings. Treat it as a deterrent for a shared home network, not real security: there are no user accounts, traffic is plain HTTP, and the readings stay open. Forgot it? Delete `data/settings.json` (or just its `security` block) on the host and restart.
 
-- Don't port-forward or reverse-proxy the dashboard to the internet, passcode or not.
-- The optional Google path exposes only the narrow fulfillment endpoints through the Cloudflare Tunnel, guarded by a shared token; treat that token as a secret.
+- Don't port-forward or reverse-proxy the raw dashboard to the internet, passcode or not; on its own it has no login. The supported way to reach it from outside your LAN is **Cloudflare Access** in front of the bundled tunnel: a login wall at Cloudflare's edge that gates the hostname to your own email(s), so an unauthenticated visitor is bounced to a sign-in page and the origin is never served to them, no VPN involved. It's free for a personal user and needs a domain on your Cloudflare account; step-by-step in [`docs/DEEP_DIVE.md`](docs/DEEP_DIVE.md#remote-access-with-cloudflare-access).
+- If you run Google Home, its three fulfillment paths (`/fulfillment`, `/auth`, `/token`) have to stay public for Google's servers to reach them (they can't sign in), so a path-scoped Access bypass keeps just those open while the rest of the hostname stays gated. They're guarded only by the shared Google token, so treat that token as a secret. No Google Home means no bypass: gate the whole hostname.
 - The bridge is read-only against your Sigenergy system, so worst case is exposure of your energy readings, not control of your hardware.
 
 For more detail, see: [`docs/DEEP_DIVE.md`](docs/DEEP_DIVE.md#security-model)

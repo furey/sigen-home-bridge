@@ -6,9 +6,11 @@ const dataDir = fileURLToPath(new URL('../../tmp/test-data-security', import.met
 
 process.env.DATA_DIR = dataDir
 
-const { loadSettings, getSettings, updateSecurity, publicSettings } = await import('../settings.js')
+const { loadSettings, getSettings, updateSettings, updateSecurity, publicSettings } =
+  await import('../settings.js')
 const {
-  hashPasscode, passcodeMatches, requirePasscode, unlock, lock, sessionStatus, setPasscode, clearPasscode
+  hashPasscode, passcodeMatches, requirePasscode, requireGoogleToken,
+  unlock, lock, sessionStatus, setPasscode, clearPasscode
 } = await import('../security.js')
 
 const reply = () => {
@@ -30,6 +32,14 @@ const gate = (token) => {
   const response = reply()
   let passed = false
   requirePasscode({ headers }, response, () => { passed = true })
+  return { passed, response }
+}
+
+const googleGate = (token) => {
+  const headers = token ? { authorization: `Bearer ${token}` } : {}
+  const response = reply()
+  let passed = false
+  requireGoogleToken({ headers }, response, () => { passed = true })
   return { passed, response }
 }
 
@@ -193,5 +203,23 @@ describe('set and clear', () => {
     const second = call(setPasscode, { body: { passcode: '2222' } }).body.token
     expect(gate(first).passed).toBe(false)
     expect(gate(second).passed).toBe(true)
+  })
+})
+
+describe('google fulfillment auth', () => {
+  beforeEach(() => updateSettings({ google: { authToken: 'fulfil-secret' } }))
+
+  it('passes through with the configured google token', () => {
+    expect(googleGate('fulfil-secret').passed).toBe(true)
+  })
+
+  it('rejects a missing token with 401', () => {
+    const { passed, response } = googleGate()
+    expect(passed).toBe(false)
+    expect(response.statusCode).toBe(401)
+  })
+
+  it('rejects a wrong token', () => {
+    expect(googleGate('not-the-token').passed).toBe(false)
   })
 })

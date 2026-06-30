@@ -300,13 +300,13 @@ Everything runs through one Express app on `SERVER_PORT` (default 5163). Reads a
 | GET           | `/api/history/stats`                         | Held sample count and time span                                                | open     |
 | GET           | `/api/history/export`                        | Full retained series; `format=json\|csv`, `every=<seconds>`                    | open     |
 | GET           | `/api/settings`                              | Public settings, with secrets stripped                                         | open     |
-| GET           | `/api/homekit/pairing`                       | HomeKit setup URI, pairing code, and QR                                        | open     |
+| GET           | `/api/homekit/pairing`                       | HomeKit setup URI, pairing code, and QR                                        | passcode |
 | PUT           | `/api/settings`                              | Update settings                                                                | passcode |
 | POST          | `/api/settings/reset`                        | Reset settings to the env seeds                                                | passcode |
 | POST          | `/api/unlock`, `/api/lock`                   | Open or revoke a settings session                                              | open     |
 | POST · DELETE | `/api/security/passcode`                     | Set or clear the passcode                                                      | passcode |
-| POST          | `/api/test/gateway`, `/api/discover/gateway` | Test one gateway or sweep the LAN                                              | open     |
-| POST          | `/api/test/weather`, `/api/test/alert`       | Probe weather coordinates or fire a sample alert                               | open     |
+| POST          | `/api/test/gateway`, `/api/discover/gateway` | Test one gateway or sweep the LAN                                              | passcode |
+| POST          | `/api/test/weather`, `/api/test/alert`       | Probe weather coordinates or fire a sample alert                               | passcode |
 | POST · GET    | `/fulfillment`, `/auth`, `/token`            | Google Smart Home fulfillment and stub OAuth                                   | token    |
 
 ### `GET /api/history`
@@ -388,15 +388,27 @@ Both halves are configurable in Settings → Google Home, since Google's trade-o
 
 ## Cloudflare Tunnel
 
-Google fulfillment must be reachable over HTTPS, which a tunnel provides without opening a port. Create a tunnel in Cloudflare Zero Trust, route a hostname to `http://localhost:5163`, copy the token into `CLOUDFLARE_TUNNEL_TOKEN`, then start the sidecar with its profile:
+A Cloudflare Tunnel exposes the bridge over HTTPS without opening a port on your router. Google Home requires it (Google's servers call a public fulfillment URL rather than reaching your LAN), and it's also the cleanest way to reach the dashboard itself from outside; pair it with Cloudflare Access ([below](#remote-access-with-cloudflare-access)) and you get an authenticated public URL with no VPN.
+
+You need a domain on Cloudflare for this. The bundled sidecar uses a remotely-managed (token) tunnel, which routes a public hostname on a domain you've added to your Cloudflare account; any domain on the free plan works, and you can register one through Cloudflare if you don't have one. That requirement is real: Cloudflare's free `*.trycloudflare.com` quick tunnels hand you a throwaway URL that changes on every restart and can't be gated with Access, so they suit neither a stable Google fulfillment URL nor a gated dashboard. Create the tunnel in Cloudflare Zero Trust, route your hostname to `http://localhost:5163`, copy the token into `CLOUDFLARE_TUNNEL_TOKEN`, then start the sidecar with its profile:
 
 ```bash
 docker compose --profile tunnel up -d
 ```
 
-The `cloudflared` service in `compose.yaml` runs the tunnel; it sits behind the `tunnel` profile and is off by default. Skip all of this if you only use HomeKit.
+The `cloudflared` service in `compose.yaml` runs the tunnel; it sits behind the `tunnel` profile and is off by default. Skip all of this if you only use HomeKit and don't need a remote dashboard.
 
 By default `cloudflared` uses the QUIC transport over UDP. On hosts that cap the UDP receive buffer below what QUIC wants (a Synology NAS, for one), one of the four edge connections can wedge in a reconnect loop; the logs then show repeated `control stream encountered a failure` and `failed to run the datagram handler` errors even though the tunnel still serves. Set `TUNNEL_TRANSPORT_PROTOCOL=http2` on the service to switch to TCP/7844, which sidesteps the QUIC/UDP path. For this read-only, low-bandwidth bridge the transport choice makes no practical difference to performance.
+
+### Remote access with Cloudflare Access
+
+The tunnel alone publishes the dashboard to anyone who learns the hostname, and the app has no login of its own, so don't stop there. Cloudflare Access (part of Zero Trust, free for a personal user) puts an identity check at Cloudflare's edge: a request without a valid Access session is bounced to a sign-in page at `https://<your-team>.cloudflareaccess.com/...` and only reaches the tunnel after it matches a policy. The result is a dashboard you can open from anywhere, authenticated, with the unauthenticated origin never exposed to the public internet.
+
+Set it up in Zero Trust → Access → Applications:
+
+1. **Gate the whole hostname.** Add a self-hosted application whose domain is your tunnel hostname with no path, and give it one policy: action **Allow**, include **Emails** = your address (add more for family). With no external identity provider configured, Cloudflare's built-in **One-time PIN** is the login method, so a visitor enters an allowed email, gets a one-time code by email, and is let in; nothing else to wire up.
+2. **If you use Google Home, exempt its three paths.** Google's servers can't do an interactive login, so add a second self-hosted application scoped to the three machine-to-machine paths (`/fulfillment`, `/auth`, and `/token` on the same hostname) with one policy: action **Bypass**, include **Everyone**. Access evaluates Bypass first and the most specific hostname-plus-path match wins, so those three stay public while everything else stays gated. They remain guarded only by the shared Google token (`GOOGLE_AUTH_TOKEN`), so keep it secret. If you don't run Google Home, skip this second app and the entire hostname is gated.
+3. **Confirm it's live.** From off your LAN, `curl -sS -o /dev/null -w "%{http_code} %{redirect_url}\n" https://<your-host>/api/state` should return a `302` to `<your-team>.cloudflareaccess.com`, and a bypassed Google path (for example `/token`) should not redirect there. Edge changes propagate in well under a minute.
 
 ## Local development
 
@@ -493,15 +505,15 @@ sigen-home-bridge/
 
 Run from the repository root.
 
-| Script                | Action                                                 |
-| --------------------- | ------------------------------------------------------ |
-| `npm run install:all` | Install root, server, and UI dependencies              |
-| `npm run dev`         | Run the bridge and the Vite dev server together        |
-| `npm run build`       | Build the UI into `ui/dist`                            |
-| `npm start`           | Start the bridge (serves the built UI)                 |
-| `npm test`            | Run the server unit tests                              |
-| `npm run probe`       | Read the gateway once and print decoded values         |
-| `npm run screenshots` | Recapture the README screenshots (Docker + Playwright) |
+| Script                | Action                                                             |
+| --------------------- | ------------------------------------------------------------------ |
+| `npm run install:all` | Install root, server, and UI dependencies                          |
+| `npm run dev`         | Run the bridge and the Vite dev server together                    |
+| `npm run build`       | Build the UI into `ui/dist`                                        |
+| `npm start`           | Start the bridge (serves the built UI)                             |
+| `npm test`            | Run the server unit tests                                          |
+| `npm run probe`       | Read the gateway once and print decoded values                     |
+| `npm run screenshots` | Recapture the README screenshots (Docker + Playwright)             |
 | `npm run walkthrough` | Record the README walkthrough video (Docker + Playwright + ffmpeg) |
 
 ## Verifying the gateway
@@ -522,10 +534,10 @@ Reads it does not recognise are skipped rather than fatal, so a clean run agains
 
 ## Security model
 
-The dashboard and its read APIs (state, history, settings, SSE) have no authentication, and the Google OAuth endpoints are stubs that accept any credentials. What you can lock is mutation: set a 4-digit passcode under Settings → Security and the routes that change configuration (`PUT /api/settings`, `POST /api/settings/reset`, and the passcode routes themselves) start requiring a session token.
+The dashboard and its read APIs (state, history, settings, SSE) have no authentication, and the `/auth` and `/token` OAuth endpoints are stubs that accept any credentials. Setting a 4-digit passcode under Settings → Security raises the floor three ways: the routes that change configuration (`PUT /api/settings`, `POST /api/settings/reset`, and the passcode routes) require a session token; the diagnostic and pairing routes (`/api/test/*`, `/api/discover/gateway`, `/api/homekit/pairing`) require it too; and an unauthenticated read of `/api/settings` blanks the values worth hiding (the gateway host, the HomeKit pairing PIN, and each alert's webhook URL) until a valid token unlocks them. Separately, `/fulfillment` checks the Google bearer with a timing-safe compare whenever `GOOGLE_AUTH_TOKEN` is set, so Google's calls carry the token the stub `/token` handed them.
 
 The passcode is stored as a salted scrypt hash in the `security` section of `settings.json`; the plaintext is never written, and the API returns only `passcodeSet: true|false`, never the hash. `POST /api/unlock` checks a submitted passcode and, on a match, hands back an in-memory session token (12-hour TTL) that the browser keeps in `sessionStorage` and sends as `Authorization: Bearer …` on every mutating call. Five wrong tries trips a one-minute lockout. Tokens live in server memory only, so a restart logs everyone out while the hash persists. When no passcode is set the gate is open, which is how you set the first one.
 
-This is a deterrent against casual changes on a shared LAN, not real auth: reads stay open and it rides plain HTTP with no user accounts behind it. The recovery path if you forget the passcode is the server file: delete `settings.json` (or remove its `security` block) and restart, or reset configuration from another unlocked session. Keep the service off the public internet except for the narrow Google fulfillment path through the tunnel, and treat `GOOGLE_AUTH_TOKEN` as a shared secret rather than real auth.
+This is a deterrent against casual changes on a shared LAN, not real auth: reads stay open and it rides plain HTTP with no user accounts behind it. The recovery path if you forget the passcode is the server file: delete `settings.json` (or remove its `security` block) and restart, or reset configuration from another unlocked session. Keep the raw service off the public internet; to reach it remotely, front the tunnel with Cloudflare Access ([Remote access with Cloudflare Access](#remote-access-with-cloudflare-access)), which authenticates at the edge before any request reaches the origin and so supplies the login the app itself lacks. The Google fulfillment path is the deliberate exception that stays public, since Google's servers can't sign in, so treat `GOOGLE_AUTH_TOKEN` as a shared secret rather than real auth.
 
 On the client, the 4-digit entry is one component (`PinPad.vue`) with two input modes chosen by `(hover: hover)`: touch devices get a tappable keypad that auto-submits on the fourth digit, hover-capable (desktop) devices get a styled keyboard text field instead of the dot grid. The Security settings section sets or changes the passcode with the same component in a choose-then-confirm sequence. In landscape the keypad reflows to two columns (header beside the grid) so it never needs scrolling: a phone, short on height, gets compact keys, while a tablet gets the same two columns scaled up to fill the screen with full-size keys. That split keys on the landscape viewport height rather than its width, because iOS Safari can report a width small enough under display zoom to mistake a tablet for a phone. `PasscodeGate.vue` is a fullscreen takeover rather than a card sitting under the settings header: it drops the usual settings chrome and offers a labelled Cancel that backs out to wherever you came from (dashboard or trends) without unlocking. Cancel sits where the eye already is, so it follows the layout: under the keypad in portrait, under the text field on desktop, and under the left-column text in the landscape two-column form (one button per position, toggled by the same media query); on desktop the Escape key does the same thing. Because the gate animates away moments after it succeeds, it works to hold its layout still: on success Cancel mutes in place rather than unmounting, the landscape form pins its two columns to equal halves so the keypad never slides when the status text changes, and in that form the status splits onto two lines ("Incorrect passcode." over "3 tries left.") instead of reflowing the column width. It verifies the code, plays a brief lock-springs-open success animation, holds for a beat, then commits the returned token. A wrong try and the lockout countdown replace the "Enter your passcode to access." prompt in place (red for a bad attempt, amber while locked out) and clear on the next keypress, so a failed attempt recolours one line instead of appending a second one and shifting the layout; on success that same line turns green and reads "Access granted." through the celebration. That verify-then-commit split is deliberate: committing the token flips the gate off and reveals Settings, so the animation runs first and the commit lands at the end, otherwise the celebration would be cut short. `prefers-reduced-motion` collapses it to a quick fade.

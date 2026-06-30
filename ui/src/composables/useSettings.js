@@ -10,7 +10,7 @@ export const useSettings = () => {
   const load = async () => {
     status.value = 'loading'
     try {
-      Object.assign(data, await (await fetch('/api/settings')).json())
+      Object.assign(data, await fetchSettings())
       applyAppearance(data.appearance)
       loadedOnce = true
       status.value = 'idle'
@@ -22,6 +22,12 @@ export const useSettings = () => {
   }
 
   const loadOnce = async () => (loadedOnce ? data : load())
+
+  const reload = async () => {
+    Object.assign(data, await fetchSettings())
+    applyAppearance(data.appearance)
+    return data
+  }
 
   const save = async (patch) => {
     status.value = 'saving'
@@ -84,7 +90,10 @@ export const useSettings = () => {
     }
   }
 
-  const commitSession = (token) => useSession().setToken(token)
+  const commitSession = (token) => {
+    useSession().setToken(token)
+    return reload()
+  }
 
   const lock = async () => {
     const headers = authHeaders()
@@ -147,10 +156,13 @@ const undismiss = () => {
   } catch {}
 }
 
+const fetchSettings = async () =>
+  (await fetch('/api/settings', { headers: authHeaders() })).json()
+
 const postJson = async (url, body) =>
   (await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(body)
   })).json()
 

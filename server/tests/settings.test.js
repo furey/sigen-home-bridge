@@ -592,3 +592,40 @@ describe('alerts migration', () => {
     })
   })
 })
+
+describe('secret redaction when locked', () => {
+  beforeAll(() => updateSettings({
+    sigen: { host: '10.0.0.9' },
+    homekit: { pin: '111-22-333' },
+    alerts: {
+      items: [{
+        name: 'Hook', trigger: { type: 'gatewayOffline' },
+        channels: { webhook: { enabled: true, url: 'https://ntfy.sh/secret' } }
+      }]
+    }
+  }))
+
+  it('exposes secrets when no passcode is set', () => {
+    updateSecurity({ passcode: null })
+    const open = publicSettings({ authenticated: false })
+    expect(open.homekit.pin).toBe('111-22-333')
+    expect(open.sigen.host).toBe('10.0.0.9')
+    expect(open.alerts.items[0].channels.webhook.url).toBe('https://ntfy.sh/secret')
+  })
+
+  it('redacts the pin, gateway host and webhook url for an unauthenticated caller once a passcode is set', () => {
+    updateSecurity({ passcode: { hash: 'abcd1234', salt: 'beef' } })
+    const locked = publicSettings({ authenticated: false })
+    expect(locked.homekit.pin).toBe('')
+    expect(locked.sigen.host).toBe('')
+    expect(locked.alerts.items[0].channels.webhook.url).toBe('')
+  })
+
+  it('exposes secrets to an authenticated caller and leaves the stored values intact', () => {
+    const open = publicSettings({ authenticated: true })
+    expect(open.homekit.pin).toBe('111-22-333')
+    expect(open.sigen.host).toBe('10.0.0.9')
+    expect(open.alerts.items[0].channels.webhook.url).toBe('https://ntfy.sh/secret')
+    updateSecurity({ passcode: null })
+  })
+})
