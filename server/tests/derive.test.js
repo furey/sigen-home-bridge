@@ -1,7 +1,7 @@
 process.env.TZ = 'UTC'
 
 import { describe, expect, it } from 'vitest'
-import { activeRate, batteryEstimate, costPerHour, dailyCost, netPerHour } from '../derive.js'
+import { activeRate, batteryEstimate, costPerHour, dailyCost, netPerHour, socPercent } from '../derive.js'
 
 const PEAK = { start: '16:00', end: '23:00', rate: 0.572 }
 const OFF_PEAK = { start: '11:00', end: '14:00', rate: 0 }
@@ -19,6 +19,31 @@ describe('activeRate', () => {
   it('matches a window that wraps past midnight', () => {
     expect(activeRate({ windows: [OVERNIGHT], defaultRate: 0.3, minutes: 2 * 60 })).toBe(0.1)
     expect(activeRate({ windows: [OVERNIGHT], defaultRate: 0.3, minutes: 12 * 60 })).toBe(0.3)
+  })
+})
+
+describe('socPercent', () => {
+  it('rounds normally away from the rails', () => {
+    expect(socPercent(50.4)).toBe(50)
+    expect(socPercent(15.6)).toBe(16)
+  })
+
+  it('never reads full unless genuinely at 100', () => {
+    expect(socPercent(99.7)).toBe(99)
+    expect(socPercent(99.5)).toBe(99)
+    expect(socPercent(100)).toBe(100)
+  })
+
+  it('never reads empty unless genuinely at 0', () => {
+    expect(socPercent(0.4)).toBe(1)
+    expect(socPercent(0)).toBe(0)
+  })
+
+  it('clamps out-of-range and missing values', () => {
+    expect(socPercent(120)).toBe(100)
+    expect(socPercent(-5)).toBe(0)
+    expect(socPercent(null)).toBe(0)
+    expect(socPercent(undefined)).toBe(0)
   })
 })
 

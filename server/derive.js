@@ -52,6 +52,13 @@ export const tariffConfigured = (tariff) =>
   tariff.zeroDrawCredit.enabled ||
   tariff.superExportCredit.enabled
 
+export const socPercent = (soc) => {
+  const value = Number(soc) || 0
+  if (value <= 0) return 0
+  if (value >= 100) return 100
+  return Math.min(99, Math.max(1, Math.round(value)))
+}
+
 export const batteryEstimate = (samples, { capacityKwh = null, reserveSoc = 0 } = {}) => {
   if (!samples.length) return IDLE
   const charging = currentDirection(samples)

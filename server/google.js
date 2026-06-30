@@ -1,6 +1,7 @@
 import { getSettings } from './settings.js'
 import { GOOGLE_METRICS } from './config.js'
 import { state } from './state.js'
+import { socPercent } from './derive.js'
 
 export const handleIntent = (body) => {
   const requestId = body?.requestId ?? ''
@@ -63,7 +64,7 @@ const energyStorageRender = {
   attributes: () => ({ queryOnlyEnergyStorage: true, isRechargeable: true }),
   state: (soc) => ({
     descriptiveCapacityRemaining: descriptiveCapacity(soc),
-    capacityRemaining: [{ rawValue: Math.round(soc ?? 0), unit: 'PERCENTAGE' }],
+    capacityRemaining: [{ rawValue: socPercent(soc), unit: 'PERCENTAGE' }],
     isCharging: (state.batteryPower ?? 0) > CHARGE_THRESHOLD_WATTS,
     isPluggedIn: true
   })
@@ -85,7 +86,7 @@ const sensorRender = (unit) => ({
 
 const BATTERY_RENDERS = {
   tile: energyStorageRender,
-  reading: temperatureRender((soc) => Math.round(soc ?? 0))
+  reading: temperatureRender((soc) => socPercent(soc))
 }
 
 const POWER_RENDERS = {

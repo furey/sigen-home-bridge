@@ -16,6 +16,7 @@ import { config, HOMEKIT_METRICS } from './config.js'
 import { getSettings } from './settings.js'
 import { state } from './state.js'
 import { getActiveAlertIds } from './alerts.js'
+import { socPercent } from './derive.js'
 
 export const getPairing = () => {
   if (!pairingUri) return { uri: '', pin: getSettings().homekit.pin, qr: '' }
@@ -88,8 +89,8 @@ const nameFor = (key, labels) =>
   labels?.[key]?.trim() || HOMEKIT_METRICS.find((metric) => metric.key === key).defaultName
 
 const pushValues = () => {
-  socHumidity.updateCharacteristic(Characteristic.CurrentRelativeHumidity, clampPercent(state.batterySoc))
-  battery.updateCharacteristic(Characteristic.BatteryLevel, clampPercent(state.batterySoc))
+  socHumidity.updateCharacteristic(Characteristic.CurrentRelativeHumidity, socPercent(state.batterySoc))
+  battery.updateCharacteristic(Characteristic.BatteryLevel, socPercent(state.batterySoc))
   battery.updateCharacteristic(Characteristic.StatusLowBattery, lowBattery(state.batterySoc))
   battery.updateCharacteristic(Characteristic.StatusFault, faultValue())
   for (const { service, key } of sensors) {
@@ -125,8 +126,6 @@ const deriveUsername = (seed) =>
 
 const powerReading = (watts) =>
   powerUnit === 'watts' ? Math.round(watts) : watts / 1000
-
-const clampPercent = (value) => Math.max(0, Math.min(100, Math.round(value)))
 
 const lowBattery = (value) =>
   value < LOW_BATTERY_PERCENT

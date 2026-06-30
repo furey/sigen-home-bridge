@@ -1,7 +1,7 @@
 import { getSettings } from './settings.js'
 import { state, publish } from './state.js'
 import { getHistoryAll } from './history.js'
-import { batteryEstimate, netPerHour, tariffConfigured } from './derive.js'
+import { batteryEstimate, netPerHour, socPercent, tariffConfigured } from './derive.js'
 import { getTrigger } from './triggers.js'
 
 export const startAlerts = () => {
@@ -120,7 +120,7 @@ const payloadFor = ({ item, edge, at, ctx, sample = null }) => ({
   trigger: item.trigger.type,
   message: sample ? sample.message : messageFor(item, edge, ctx),
   condition: sample ? sample.condition : conditionFor(item, ctx),
-  batterySoc: Math.round(state.batterySoc),
+  batterySoc: socPercent(state.batterySoc),
   connected: state.connected,
   at: new Date(at).toISOString()
 })
