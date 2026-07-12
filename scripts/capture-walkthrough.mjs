@@ -245,6 +245,9 @@ const currentState = async () => (await fetch(`${BASE}/api/state`)).json()
 
 const open = async (page, path, settle = 2200) => {
   await page.goto(BASE + path, { waitUntil: 'domcontentloaded', timeout: 30000 })
+  await page.evaluate(() => document.fonts.load('600 32px "Inter Variable"')).catch(() => {})
+  await page.waitForFunction(() => document.fonts.check('600 32px "Inter Variable"'), { timeout: 9000 })
+    .catch(() => { console.log('⚠ Inter Variable did not load for', page.url()) })
   await page.evaluate(() => document.fonts.ready.then(() => true)).catch(() => {})
   await dwell(page, settle)
 }
