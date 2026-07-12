@@ -20,8 +20,10 @@ export const useCostReadout = () => {
   const mode = computed(() => data.tariff?.costMode ?? 'perDay')
   const estimateLabel = computed(() =>
     mode.value === 'perHour' ? 'Hourly Cost Estimate' : "Today's Cost Estimate")
+  const estimateLabelShort = computed(() =>
+    mode.value === 'perHour' ? 'Hourly Estimate' : "Today's Estimate")
 
-  return { amount, currency, mode, estimateLabel, daily: cost }
+  return { amount, currency, mode, estimateLabel, estimateLabelShort, daily: cost }
 }
 
 const perHourCost = (state, tariff) => {

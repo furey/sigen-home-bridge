@@ -100,7 +100,12 @@ const temperature = computed(() => {
 })
 const locationName = computed(() => state.outdoorLocation || null)
 
-const { amount: costAmount, currency: costCurrency, estimateLabel: costLabel } = useCostReadout()
+const {
+  amount: costAmount,
+  currency: costCurrency,
+  estimateLabel: costLabel,
+  estimateLabelShort: costLabelShort
+} = useCostReadout()
 const showCostTile = computed(() => Boolean(settings.tariff?.showOnDashboard))
 const smartLoads = computed(() => state.devices.filter((device) => device.type === 'smartLoad'))
 const showSmartPort = computed(() =>
@@ -286,13 +291,14 @@ const lastUpdated = computed(() =>
               >
                 <component :is="home.icon" class="w-4 h-4" />Home
                 <template v-if="showSmartPort">
-                  <span class="text-zinc-600">•</span><Plug class="w-4 h-4" />Smart Port
+                  <span class="text-zinc-600">•</span><Plug class="w-4 h-4" aria-label="Smart Port" />
+                  <span class="hidden md:inline">Smart Port</span>
                 </template>
               </span>
               <span
-                class="text-xs transition-opacity text-zinc-500"
+                class="text-xs text-right transition-opacity text-zinc-500"
                 :class="{ 'opacity-30': dimmed('home-right') }"
-              >{{ costLabel }}</span>
+              ><span class="md:hidden">{{ costLabelShort }}</span><span class="hidden md:inline">{{ costLabel }}</span></span>
             </div>
             <div
               v-if="showSmartPort"
@@ -304,7 +310,7 @@ const lastUpdated = computed(() =>
               </span>
               <span class="text-sm metric-unit text-zinc-600">{{ home.unit }}</span>
             </div>
-            <div class="flex items-baseline justify-between" :class="showSmartPort ? '' : 'mt-auto'">
+            <div class="flex items-baseline justify-between" :class="showSmartPort ? '-mt-1 sm:-mt-0.5' : 'mt-auto'">
               <div
                 class="flex items-baseline gap-1 transition-opacity"
                 :class="{ 'opacity-30': dimmed('home-left') }"
@@ -335,10 +341,11 @@ const lastUpdated = computed(() =>
                 <component :is="cell.metric.icon" class="w-4 h-4" />
                 {{ smartPortOnTile(cell) ? 'Home' : cell.metric.label }}
                 <template v-if="smartPortOnTile(cell)">
-                  <span class="text-zinc-600">•</span><Plug class="w-4 h-4" />Smart Port
+                  <span class="text-zinc-600">•</span><Plug class="w-4 h-4" aria-label="Smart Port" />
+                  <span class="hidden md:inline">Smart Port</span>
                 </template>
               </span>
-              <span v-if="labelOf(cell.metric)" class="text-xs text-zinc-500">
+              <span v-if="labelOf(cell.metric)" class="text-xs text-right text-zinc-500">
                 {{ labelOf(cell.metric) }}
               </span>
             </span>
@@ -348,7 +355,7 @@ const lastUpdated = computed(() =>
               </span>
               <span class="text-sm metric-unit text-zinc-600">{{ home.unit }}</span>
             </span>
-            <span class="flex items-baseline gap-1" :class="smartPortOnTile(cell) ? '' : 'mt-auto'">
+            <span class="flex items-baseline gap-1" :class="smartPortOnTile(cell) ? '-mt-1 sm:-mt-0.5' : 'mt-auto'">
               <component
                 :is="flowIconOf(cell.metric)"
                 v-if="flowIconOf(cell.metric)"
