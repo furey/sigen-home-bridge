@@ -25,9 +25,10 @@ const run = async () => {
 
   if (wants('data')) {
     const live = await daytimeState()
+    const settings = await stagedSettings()
     for (const shot of dataShots) {
       const state = shot.inject ? live : null
-      await capture(() => shotViewport(browser, { ...shot, state }), shot.file)
+      await capture(() => shotViewport(browser, { ...shot, state, settings }), shot.file)
     }
   }
 
@@ -68,8 +69,8 @@ const settingsShots = [
   { kind: 'crop', route: '/settings/google-home', file: 'settings-google-home.png' }
 ]
 
-const shotViewport = async (browser, { profile, path, file, view, prep, state, clip }) => {
-  const { context, page } = await newPage(browser, PROFILES[profile], view, state)
+const shotViewport = async (browser, { profile, path, file, view, prep, state, clip, settings }) => {
+  const { context, page } = await newPage(browser, PROFILES[profile], view, state, settings)
   await open(page, path)
   if (prep) await prep(page)
   const options = { path: `${OUT}/${file}` }
@@ -227,7 +228,12 @@ const mainBox = (page) => page.evaluate(() => {
   return { left: Math.round(rect.left), width: Math.round(rect.width), height: Math.round(rect.height) }
 })
 
-const newPage = async (browser, profile, view, state) => {
+const stagedSettings = async () => {
+  const real = await (await fetch(`${BASE}/api/settings`)).json()
+  return { ...real, smartLoads: { ...real.smartLoads, showOnDashboard: true } }
+}
+
+const newPage = async (browser, profile, view, state, settings) => {
   const context = await browser.newContext({
     viewport: profile.viewport,
     deviceScaleFactor: profile.deviceScaleFactor,
@@ -238,6 +244,10 @@ const newPage = async (browser, profile, view, state) => {
   if (state) {
     await context.route('**/api/state', (route) =>
       route.fulfill({ contentType: 'application/json', body: JSON.stringify(state) }))
+  }
+  if (state && settings) {
+    await context.route('**/api/settings', (route) =>
+      route.fulfill({ contentType: 'application/json', body: JSON.stringify(settings) }))
   }
   await context.route('**/api/session', (route) => route.fulfill({
     status: 200,
