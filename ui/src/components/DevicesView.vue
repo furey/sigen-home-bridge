@@ -56,7 +56,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
 </script>
 
 <template>
-  <main class="flex flex-col gap-4 min-h-app p-safe">
+  <main class="flex flex-col gap-3 min-h-app p-safe sm:gap-4">
     <header class="grid items-center grid-cols-3">
       <div class="flex justify-start">
         <button
@@ -94,11 +94,11 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
     </header>
 
     <div class="flex-1">
-      <section v-if="hasDevices" class="flex flex-col gap-4">
+      <section v-if="hasDevices" class="flex flex-col gap-3 sm:gap-4">
         <article
           v-for="device in inverters"
           :key="device.unitId"
-          class="p-5 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800"
+          class="p-4 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800 sm:p-5"
         >
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
@@ -194,7 +194,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         <article
           v-for="load in smartLoads"
           :key="`smartLoad-${load.index}`"
-          class="p-5 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800"
+          class="p-4 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800 sm:p-5"
         >
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">

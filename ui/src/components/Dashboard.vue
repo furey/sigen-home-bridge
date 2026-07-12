@@ -123,7 +123,7 @@ const lastUpdated = computed(() =>
 </script>
 
 <template>
-  <main class="flex flex-col gap-4 min-h-app p-safe">
+  <main class="flex flex-col gap-3 min-h-app p-safe sm:gap-4">
     <header class="grid items-center grid-cols-3">
       <div class="flex items-center gap-1 text-sm text-zinc-300">
         <span
@@ -178,11 +178,11 @@ const lastUpdated = computed(() =>
       mode="out-in"
     >
     <TrendsView v-if="trendsActive" key="trends" class="flex-1" />
-    <section v-else key="quadrants" class="grid flex-1 min-h-0 grid-cols-1 gap-4 quadrants sm:grid-cols-2">
+    <section v-else key="quadrants" class="grid flex-1 min-h-0 grid-cols-1 gap-3 quadrants sm:grid-cols-2 sm:gap-4">
       <template v-for="cell in quadrants" :key="cell.key">
         <div
           v-if="cell.key === 'battery'"
-          class="relative flex flex-col h-full p-5 transition dual-cell rounded-2xl bg-zinc-900 ring-1 ring-zinc-800 hover:ring-zinc-700 @container"
+          class="relative flex flex-col h-full p-4 transition dual-cell rounded-2xl bg-zinc-900 ring-1 ring-zinc-800 hover:ring-zinc-700 sm:p-5 @container"
         >
           <button
             class="absolute inset-y-0 left-0 z-10 w-1/2 rounded-l-2xl"
@@ -267,7 +267,7 @@ const lastUpdated = computed(() =>
 
         <div
           v-else-if="cell.key === 'loadPower' && showCostTile"
-          class="relative flex flex-col h-full p-5 transition dual-cell rounded-2xl bg-zinc-900 ring-1 ring-zinc-800 hover:ring-zinc-700"
+          class="relative flex flex-col h-full p-4 transition dual-cell rounded-2xl bg-zinc-900 ring-1 ring-zinc-800 hover:ring-zinc-700 sm:p-5"
         >
           <button
             class="absolute inset-y-0 left-0 z-10 w-1/2 rounded-l-2xl"
@@ -332,7 +332,7 @@ const lastUpdated = computed(() =>
 
         <button
           v-else
-          class="block h-full p-5 text-left transition rounded-2xl bg-zinc-900 ring-1 ring-zinc-800 hover:ring-zinc-700"
+          class="block h-full p-4 text-left transition rounded-2xl bg-zinc-900 ring-1 ring-zinc-800 hover:ring-zinc-700 sm:p-5"
           @click="open(cell.metric)"
         >
           <span class="flex flex-col w-full h-full">

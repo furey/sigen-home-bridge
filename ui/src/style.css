@@ -14,14 +14,14 @@
 
 @utility p-safe {
   padding-top: max(var(--safe-floor-top), env(safe-area-inset-top));
-  padding-right: max(--spacing(6), env(safe-area-inset-right));
-  padding-bottom: max(--spacing(6), env(safe-area-inset-bottom));
-  padding-left: max(--spacing(6), env(safe-area-inset-left));
+  padding-right: max(var(--safe-floor-side), env(safe-area-inset-right));
+  padding-bottom: max(var(--safe-floor-side), env(safe-area-inset-bottom));
+  padding-left: max(var(--safe-floor-side), env(safe-area-inset-left));
 }
 
 @utility px-safe {
-  padding-right: max(--spacing(6), env(safe-area-inset-right));
-  padding-left: max(--spacing(6), env(safe-area-inset-left));
+  padding-right: max(var(--safe-floor-side), env(safe-area-inset-right));
+  padding-left: max(var(--safe-floor-side), env(safe-area-inset-left));
 }
 
 @utility pt-safe {
@@ -45,7 +45,14 @@
 :root {
   color-scheme: dark;
   --safe-floor-top: 1.5rem;
+  --safe-floor-side: 1.5rem;
   --app-min-height: 100svh;
+}
+
+@media (max-width: 639px) {
+  :root {
+    --safe-floor-side: 1rem;
+  }
 }
 
 @media (display-mode: standalone) {
