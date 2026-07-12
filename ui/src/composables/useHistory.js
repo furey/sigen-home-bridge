@@ -52,13 +52,14 @@ const BACKFILL_GAP_MS = 120000
 
 const REFRESH_COOLDOWN_MS = 60000
 
-const liveSample = ({ pvPower, gridPower, batteryPower, batterySoc, loadPower, outdoorTemp }, t) => ({
+const liveSample = ({ pvPower, gridPower, batteryPower, batterySoc, loadPower, smartPortPower, outdoorTemp }, t) => ({
   t,
   pvPower,
   gridPower,
   batteryPower,
   batterySoc,
   loadPower,
+  smartPortPower: smartPortPower ?? null,
   outdoorTemp: outdoorTemp ?? null
 })
 

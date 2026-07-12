@@ -8,6 +8,7 @@ export const state = {
   batterySoh: null,
   loadPower: 0,
   generalLoadPower: null,
+  smartPortPower: null,
   ratedEnergyCapacity: null,
   consumedToday: null,
   lifetimePv: null,

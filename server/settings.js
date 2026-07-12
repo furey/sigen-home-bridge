@@ -95,7 +95,7 @@ const defaults = () => ({
   battery: defaultBattery(),
   tariff: defaultTariff(),
   history: { ...config.history },
-  smartLoads: { labels: {} },
+  smartLoads: { showOnDashboard: false, labels: {} },
   alerts: defaultAlerts(),
   homekit: { ...config.homekit, labels: defaultLabels() },
   server: { ...config.server },
@@ -225,7 +225,10 @@ const mergeSections = (base, patch) => ({
   weather: { ...base.weather, ...patch?.weather },
   battery: { ...base.battery, ...patch?.battery },
   history: { ...base.history, ...patch?.history },
-  smartLoads: { labels: { ...base.smartLoads.labels, ...patch?.smartLoads?.labels } },
+  smartLoads: {
+    showOnDashboard: patch?.smartLoads?.showOnDashboard ?? base.smartLoads.showOnDashboard,
+    labels: { ...base.smartLoads.labels, ...patch?.smartLoads?.labels }
+  },
   alerts: { items: patch?.alerts?.items ?? base.alerts.items },
   tariff: {
     showOnDashboard: patch?.tariff?.showOnDashboard ?? base.tariff.showOnDashboard,
@@ -331,7 +334,10 @@ const validRetentionDays = (value) => {
   return value
 }
 
-const validSmartLoads = ({ labels } = {}) => ({ labels: validSmartLoadLabels(labels) })
+const validSmartLoads = ({ showOnDashboard, labels } = {}) => ({
+  showOnDashboard: Boolean(showOnDashboard),
+  labels: validSmartLoadLabels(labels)
+})
 
 const validSmartLoadLabels = (labels) => {
   if (labels === undefined || labels === null) return {}

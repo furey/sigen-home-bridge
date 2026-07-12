@@ -104,6 +104,7 @@ const poll = async (epoch) => {
     readings.pvPower = solarTotal(readings)
     readings.batteryPower = deriveBatteryPower(readings)
     readings.devices = await readDevices()
+    readings.smartPortPower = smartPortTotal(readings.devices)
     if (epoch !== generation) return
     Object.assign(state, readings)
     state.lastUpdated = new Date().toISOString()
@@ -148,6 +149,12 @@ const readLabelledSmartLoads = async () => {
 }
 
 const smartLoadName = (load, labels) => labels[load.index] || `Smart load ${load.index}`
+
+const smartPortTotal = (devices) => {
+  const loads = devices.filter((device) => device.type === 'smartLoad')
+  if (!loads.length) return null
+  return loads.reduce((total, load) => total + load.power, 0)
+}
 
 const nextPollInterval = () => {
   const { schedule, defaultIntervalMs } = getSettings().poll

@@ -6,9 +6,10 @@ import { TREND_RANGES, rangeFor, useDashboardView } from '../composables/useDash
 import { ChevronLast, ChevronLeft, ChevronRight, Clock, History } from '@lucide/vue'
 import { useHoverCapable } from '../composables/useHoverCapable.js'
 import { useScrub } from '../composables/useScrub.js'
+import { useSettings } from '../composables/useSettings.js'
 import {
-  FLOW_SHADES, accentFor, categoryAccentFor, directionFor, flowAccentFor, flowIconFor, formatPower,
-  iconFor, metricByKey
+  FLOW_SHADES, SMART_PORT_DIM, accentFor, categoryAccentFor, directionFor, flowAccentFor,
+  flowIconFor, formatPower, iconFor, lerpHex, metricByKey
 } from '../lib/metrics.js'
 import { themeColors } from '../lib/theme.js'
 import { skyGradientStops, sunCrossings } from '../lib/sun.js'
@@ -16,7 +17,14 @@ import { skyGradientStops, sunCrossings } from '../lib/sun.js'
 const { state } = useStateStream()
 const { samples } = useHistory()
 const { view, setRange, toggleMetric } = useDashboardView()
+const { data: settings } = useSettings()
 const hoverCapable = useHoverCapable()
+
+const smartPortActive = computed(() =>
+  Boolean(settings.smartLoads?.showOnDashboard) &&
+  state.devices.some((device) => device.type === 'smartLoad'))
+const powerKeys = computed(() => (smartPortActive.value ? withSmartPort(POWER_KEYS) : POWER_KEYS))
+const legendKeys = computed(() => (smartPortActive.value ? withSmartPort(LEGEND_KEYS) : LEGEND_KEYS))
 
 const stage = ref(null)
 const header = ref(null)
@@ -133,7 +141,7 @@ const intervalLabel = (ms) => {
   return `${Math.round(ms / 1000)} seconds`
 }
 
-const legend = computed(() => LEGEND_KEYS.map((key) => {
+const legend = computed(() => legendKeys.value.map((key) => {
   const metric = metricByKey(key)
   const tally = scrubSample.value ? pointTally(metric, key) : windowTally(metric, key)
   return {
@@ -152,7 +160,7 @@ const legend = computed(() => LEGEND_KEYS.map((key) => {
 
 const toggleHint = (key) => {
   if (view.hidden.length === 0) return 'tap to isolate'
-  const visible = LEGEND_KEYS.filter((entry) => !view.hidden.includes(entry))
+  const visible = legendKeys.value.filter((entry) => !view.hidden.includes(entry))
   if (visible.length === 1 && visible[0] === key) return 'tap to show all'
   return view.hidden.includes(key) ? 'tap to show' : 'tap to hide'
 }
@@ -212,7 +220,7 @@ const emptyTally = (metric) => ({
 })
 
 const showing = (key) => !view.hidden.includes(key)
-const activePowerKeys = computed(() => POWER_KEYS.filter(showing))
+const activePowerKeys = computed(() => powerKeys.value.filter(showing))
 
 const range = computed(() => rangeFor(view.range))
 const windowEnd = computed(() => panEnd.value == null ? now.value : panEnd.value)
@@ -329,7 +337,7 @@ const integrationGapMs = computed(() => Math.max(INTEGRATION_GAP_MS, everyMs.val
 const windowStats = computed(() => {
   const list = visible.value
   const energy = {}
-  for (const key of POWER_KEYS) energy[key] = integrate(list, key, integrationGapMs.value)
+  for (const key of powerKeys.value) energy[key] = integrate(list, key, integrationGapMs.value)
   return { energy, socDelta: socChange(list) }
 })
 
@@ -690,9 +698,13 @@ const POWER_KEYS = ['pvPower', 'loadPower', 'gridPower', 'batteryPower']
 
 const LEGEND_KEYS = ['batterySoc', 'batteryPower', 'loadPower', 'pvPower', 'gridPower']
 
+const withSmartPort = (keys) =>
+  keys.flatMap((key) => (key === 'loadPower' ? [key, 'smartPortPower'] : [key]))
+
 const LINE_COLORS = {
   get pvPower() { return themeColors.solarAccent },
   get loadPower() { return themeColors.home },
+  get smartPortPower() { return lerpHex(themeColors.home, '#000000', SMART_PORT_DIM) },
   get batterySoc() { return themeColors.socHigh }
 }
 

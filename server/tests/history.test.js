@@ -23,6 +23,7 @@ const reading = (overrides = {}) => ({
   batteryPower: 2100,
   batterySoc: 81.5,
   loadPower: 1000,
+  smartPortPower: 350,
   connected: true,
   outdoorTemp: 18,
   ...overrides
@@ -38,6 +39,7 @@ describe('history', () => {
       batteryPower: 2100,
       batterySoc: 81.5,
       loadPower: 1000,
+      smartPortPower: 350,
       outdoorTemp: 18
     })
   })
@@ -45,6 +47,11 @@ describe('history', () => {
   it('records a null outdoor temp when no reading exists yet', () => {
     recordSample(reading({ outdoorTemp: null }))
     expect(getHistory().at(-1).outdoorTemp).toBeNull()
+  })
+
+  it('records a null smart port power when no smart loads are detected', () => {
+    recordSample(reading({ smartPortPower: null }))
+    expect(getHistory().at(-1).smartPortPower).toBeNull()
   })
 
   it('falls back to now when the reading has no timestamp', () => {
@@ -95,13 +102,13 @@ describe('history downsampling', () => {
 describe('history CSV', () => {
   it('writes a header and ISO-timestamped rows with blanks for nulls', () => {
     const csv = historyToCsv([
-      { t: Date.parse('2026-06-11T10:00:00.000Z'), pvPower: 3200, gridPower: -1100, batteryPower: 2100, batterySoc: 81.5, loadPower: 1000, outdoorTemp: 18 },
-      { t: Date.parse('2026-06-11T10:00:05.000Z'), pvPower: 0, gridPower: 0, batteryPower: 0, batterySoc: 80, loadPower: 0, outdoorTemp: null }
+      { t: Date.parse('2026-06-11T10:00:00.000Z'), pvPower: 3200, gridPower: -1100, batteryPower: 2100, batterySoc: 81.5, loadPower: 1000, smartPortPower: 350, outdoorTemp: 18 },
+      { t: Date.parse('2026-06-11T10:00:05.000Z'), pvPower: 0, gridPower: 0, batteryPower: 0, batterySoc: 80, loadPower: 0, smartPortPower: null, outdoorTemp: null }
     ])
     const lines = csv.trim().split('\n')
-    expect(lines[0]).toBe('time,pvPower,gridPower,batteryPower,batterySoc,loadPower,outdoorTemp')
-    expect(lines[1]).toBe('2026-06-11T10:00:00.000Z,3200,-1100,2100,81.5,1000,18')
-    expect(lines[2]).toBe('2026-06-11T10:00:05.000Z,0,0,0,80,0,')
+    expect(lines[0]).toBe('time,pvPower,gridPower,batteryPower,batterySoc,loadPower,smartPortPower,outdoorTemp')
+    expect(lines[1]).toBe('2026-06-11T10:00:00.000Z,3200,-1100,2100,81.5,1000,350,18')
+    expect(lines[2]).toBe('2026-06-11T10:00:05.000Z,0,0,0,80,0,,')
   })
 })
 

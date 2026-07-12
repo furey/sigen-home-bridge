@@ -131,18 +131,21 @@ const shotWizard = async (browser) => {
 const daytimeState = async () => {
   const real = await (await fetch(`${BASE}/api/state`)).json()
   const pvPower = 5627
-  const loadPower = 420
-  const batteryPower = 2400
+  const smartPortPower = 4463
+  const loadPower = 420 + smartPortPower
+  const batteryPower = 500
   const batterySoc = 62
   const gridPower = loadPower + batteryPower - pvPower
   const exportPower = -gridPower
   const device = (real.devices && real.devices[0]) || {}
+  const smartLoad = (real.devices || []).find((entry) => entry.type === 'smartLoad') || {}
   return {
     ...real,
     connected: true,
     alerts: [],
     pvPower,
     loadPower,
+    smartPortPower,
     batteryPower,
     gridPower,
     batterySoc,
@@ -163,6 +166,12 @@ const daytimeState = async () => {
         { index: 2, power: 1980, voltage: 593, current: 3.3 },
         { index: 3, power: 1547, voltage: 611, current: 2.5 }
       ]
+    }, {
+      type: 'smartLoad',
+      index: smartLoad.index || 1,
+      name: smartLoad.name || 'Hot water',
+      power: smartPortPower,
+      lifetimeEnergy: smartLoad.lifetimeEnergy ?? 955.63
     }]
   }
 }
@@ -190,8 +199,10 @@ async function selectWidestRange (page) {
 
 function clipToArticle (page) {
   return page.evaluate(() => {
-    const article = document.querySelector('article')
-    const bottom = article ? Math.round(article.getBoundingClientRect().bottom) + 20 : window.innerHeight
+    const articles = [...document.querySelectorAll('article')]
+    const bottom = articles.length
+      ? Math.round(Math.max(...articles.map((article) => article.getBoundingClientRect().bottom))) + 20
+      : window.innerHeight
     return { x: 0, y: 0, width: window.innerWidth, height: bottom }
   })
 }

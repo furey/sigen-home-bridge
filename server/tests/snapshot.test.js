@@ -17,6 +17,7 @@ const baseline = {
   thirdPartyPvPower: 120,
   loadPower: 980,
   generalLoadPower: 800,
+  smartPortPower: 350,
   gridPower: -3140,
   batteryPower: 0,
   batterySoc: 80,
@@ -69,6 +70,7 @@ describe('buildSnapshot', () => {
     expect(power.solar).toBe(power.solarSigen + power.solarThirdParty)
     expect(power.home).toBe(980)
     expect(power.homeGeneral).toBe(800)
+    expect(power.smartPort).toBe(350)
   })
 
   it('derives battery energy remaining from the configured capacity', () => {

@@ -19,6 +19,7 @@ import AppleHomeSection from './components/settings/AppleHomeSection.vue'
 import GoogleHomeSection from './components/settings/GoogleHomeSection.vue'
 import HistorySection from './components/settings/HistorySection.vue'
 import SecuritySection from './components/settings/SecuritySection.vue'
+import SmartPortSection from './components/settings/SmartPortSection.vue'
 import SystemSection from './components/settings/SystemSection.vue'
 import SetupWizard from './components/SetupWizard.vue'
 
@@ -45,6 +46,7 @@ export const router = createRouter({
         { path: 'theme', name: 'settings-theme', component: ThemeSection },
         { path: 'weather', name: 'settings-weather', component: WeatherSection },
         { path: 'battery', name: 'settings-battery', component: BatterySection },
+        { path: 'smart-port', name: 'settings-smart-port', component: SmartPortSection },
         { path: 'alerts', name: 'settings-alerts', component: AlertsSection },
         { path: 'tariff', name: 'settings-tariff', component: TariffSection },
         { path: 'gateway', name: 'settings-gateway', component: GatewaySection },

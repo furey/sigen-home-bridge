@@ -66,7 +66,7 @@ export const MAX_SAMPLES = 250000
 
 export const LIVE_LIMIT = 20000
 
-const FIELDS = ['pvPower', 'gridPower', 'batteryPower', 'batterySoc', 'loadPower', 'outdoorTemp']
+const FIELDS = ['pvPower', 'gridPower', 'batteryPower', 'batterySoc', 'loadPower', 'smartPortPower', 'outdoorTemp']
 
 const CSV_HEADER = ['time', ...FIELDS]
 
@@ -109,13 +109,14 @@ const firstAfter = (t) => {
   return low
 }
 
-const toSample = ({ lastUpdated, pvPower, gridPower, batteryPower, batterySoc, loadPower, outdoorTemp }) => ({
+const toSample = ({ lastUpdated, pvPower, gridPower, batteryPower, batterySoc, loadPower, smartPortPower, outdoorTemp }) => ({
   t: lastUpdated ? Date.parse(lastUpdated) : Date.now(),
   pvPower,
   gridPower,
   batteryPower,
   batterySoc,
   loadPower,
+  smartPortPower: smartPortPower ?? null,
   outdoorTemp: outdoorTemp ?? null
 })
 
@@ -151,6 +152,7 @@ const openDatabase = () => {
     db.exec('PRAGMA journal_mode = WAL')
     db.exec('PRAGMA synchronous = NORMAL')
     db.exec(CREATE_TABLE)
+    ensureSmartPortColumn()
     insertStatement = db.prepare(INSERT_ROW)
   } catch (error) {
     db = null
@@ -177,10 +179,15 @@ const parseLegacySnapshot = () => {
   }
 }
 
+const ensureSmartPortColumn = () => {
+  const columns = db.prepare('PRAGMA table_info(samples)').all().map((column) => column.name)
+  if (!columns.includes('smartPortPower')) db.exec('ALTER TABLE samples ADD COLUMN smartPortPower REAL')
+}
+
 const loadStored = () => {
   if (!db) return []
   const rows = db.prepare(`
-    SELECT t, pvPower, gridPower, batteryPower, batterySoc, loadPower, outdoorTemp
+    SELECT t, pvPower, gridPower, batteryPower, batterySoc, loadPower, smartPortPower, outdoorTemp
     FROM samples ORDER BY t
   `).all()
   log(`restored ${rows.length} samples`)
@@ -207,8 +214,9 @@ const insertMany = (rows) => {
   }
 }
 
-const rowValues = ({ t, pvPower, gridPower, batteryPower, batterySoc, loadPower, outdoorTemp }) =>
-  [t, pvPower ?? null, gridPower ?? null, batteryPower ?? null, batterySoc ?? null, loadPower ?? null, outdoorTemp ?? null]
+const rowValues = ({ t, pvPower, gridPower, batteryPower, batterySoc, loadPower, smartPortPower, outdoorTemp }) =>
+  [t, pvPower ?? null, gridPower ?? null, batteryPower ?? null, batterySoc ?? null, loadPower ?? null,
+    smartPortPower ?? null, outdoorTemp ?? null]
 
 const rowCount = () => (db ? db.prepare('SELECT COUNT(*) AS count FROM samples').get().count : 0)
 
@@ -240,12 +248,13 @@ const CREATE_TABLE = `CREATE TABLE IF NOT EXISTS samples (
   batteryPower REAL,
   batterySoc REAL,
   loadPower REAL,
+  smartPortPower REAL,
   outdoorTemp REAL
 )`
 
 const INSERT_ROW = `INSERT OR REPLACE INTO samples
-  (t, pvPower, gridPower, batteryPower, batterySoc, loadPower, outdoorTemp)
-  VALUES (?, ?, ?, ?, ?, ?, ?)`
+  (t, pvPower, gridPower, batteryPower, batterySoc, loadPower, smartPortPower, outdoorTemp)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 
 const DELETE_BEYOND_CEILING =
   'DELETE FROM samples WHERE t < (SELECT MIN(t) FROM (SELECT t FROM samples ORDER BY t DESC LIMIT ?))'

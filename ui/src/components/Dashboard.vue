@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChartSpline, Cpu, Settings, Thermometer } from '@lucide/vue'
+import { ChartSpline, Cpu, Plug, Settings, Thermometer } from '@lucide/vue'
 import { useStateStream } from '../composables/useStateStream.js'
 import { useBatteryEstimate } from '../composables/useBatteryEstimate.js'
 import { useBatteryCharge } from '../composables/useBatteryCharge.js'
@@ -9,7 +9,9 @@ import { useDashboardView } from '../composables/useDashboardView.js'
 import { useSettings } from '../composables/useSettings.js'
 import { useHoverCapable } from '../composables/useHoverCapable.js'
 import { useScrub } from '../composables/useScrub.js'
-import { accentFor, directionFor, flowAccentFor, flowIconFor, iconFor, metricByKey } from '../lib/metrics.js'
+import {
+  accentFor, directionFor, flowAccentFor, flowIconFor, iconFor, metricByKey, smartPortAccentFor
+} from '../lib/metrics.js'
 import { useCostReadout } from '../composables/useCostReadout.js'
 import BrandMark from './BrandMark.vue'
 import MoneyValue from './MoneyValue.vue'
@@ -100,6 +102,13 @@ const locationName = computed(() => state.outdoorLocation || null)
 
 const { amount: costAmount, currency: costCurrency, estimateLabel: costLabel } = useCostReadout()
 const showCostTile = computed(() => Boolean(settings.tariff?.showOnDashboard))
+const smartLoads = computed(() => state.devices.filter((device) => device.type === 'smartLoad'))
+const showSmartPort = computed(() =>
+  Boolean(settings.smartLoads?.showOnDashboard) && smartLoads.value.length > 0)
+const smartPortWatts = computed(() => state.smartPortPower ?? 0)
+const smartPortValue = computed(() => home.format(smartPortWatts.value))
+const smartPortColor = computed(() => smartPortAccentFor(home, smartPortWatts.value))
+const smartPortOnTile = (cell) => cell.key === 'loadPower' && showSmartPort.value
 const openCost = () => router.push({ name: 'cost' })
 
 const lastUpdated = computed(() =>
@@ -276,13 +285,26 @@ const lastUpdated = computed(() =>
                 :class="{ 'opacity-30': dimmed('home-left') }"
               >
                 <component :is="home.icon" class="w-4 h-4" />Home
+                <template v-if="showSmartPort">
+                  <span class="text-zinc-600">•</span><Plug class="w-4 h-4" />Smart Port
+                </template>
               </span>
               <span
                 class="text-xs transition-opacity text-zinc-500"
                 :class="{ 'opacity-30': dimmed('home-right') }"
               >{{ costLabel }}</span>
             </div>
-            <div class="flex items-baseline justify-between mt-auto">
+            <div
+              v-if="showSmartPort"
+              class="flex items-baseline gap-1 mt-auto transition-opacity"
+              :class="{ 'opacity-30': dimmed('home-left') }"
+            >
+              <span class="text-4xl font-semibold metric-value tabular-nums sm:text-5xl" :style="{ color: smartPortColor }">
+                {{ smartPortValue }}
+              </span>
+              <span class="text-sm metric-unit text-zinc-600">{{ home.unit }}</span>
+            </div>
+            <div class="flex items-baseline justify-between" :class="showSmartPort ? '' : 'mt-auto'">
               <div
                 class="flex items-baseline gap-1 transition-opacity"
                 :class="{ 'opacity-30': dimmed('home-left') }"
@@ -310,13 +332,23 @@ const lastUpdated = computed(() =>
           <span class="flex flex-col w-full h-full">
             <span class="flex items-center justify-between w-full">
               <span class="flex items-center gap-1.5 text-sm text-zinc-400">
-                <component :is="cell.metric.icon" class="w-4 h-4" />{{ cell.metric.label }}
+                <component :is="cell.metric.icon" class="w-4 h-4" />
+                {{ smartPortOnTile(cell) ? 'Home' : cell.metric.label }}
+                <template v-if="smartPortOnTile(cell)">
+                  <span class="text-zinc-600">•</span><Plug class="w-4 h-4" />Smart Port
+                </template>
               </span>
               <span v-if="labelOf(cell.metric)" class="text-xs text-zinc-500">
                 {{ labelOf(cell.metric) }}
               </span>
             </span>
-            <span class="flex items-baseline gap-1 mt-auto">
+            <span v-if="smartPortOnTile(cell)" class="flex items-baseline gap-1 mt-auto">
+              <span class="text-4xl font-semibold metric-value tabular-nums sm:text-5xl" :style="{ color: smartPortColor }">
+                {{ smartPortValue }}
+              </span>
+              <span class="text-sm metric-unit text-zinc-600">{{ home.unit }}</span>
+            </span>
+            <span class="flex items-baseline gap-1" :class="smartPortOnTile(cell) ? '' : 'mt-auto'">
               <component
                 :is="flowIconOf(cell.metric)"
                 v-if="flowIconOf(cell.metric)"

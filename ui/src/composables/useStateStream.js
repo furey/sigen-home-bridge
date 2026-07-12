@@ -10,6 +10,7 @@ export const useStateStream = () => {
     batterySoc: 0,
     batterySoh: null,
     loadPower: 0,
+    smartPortPower: null,
     ratedEnergyCapacity: null,
     consumedToday: null,
     lifetimePv: null,

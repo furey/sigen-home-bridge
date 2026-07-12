@@ -81,7 +81,7 @@
 - **Google Home sensors**: battery and power readings in the Google Home app, reached through a free Cloudflare Tunnel, with per-device names and watt/kW display modes.
 - **Wall-display dashboard**: fullscreen per-metric readouts, adaptive layouts from desktop to phone, and per-view URLs (`/trends`, `/metric/solar`, …) so a kiosk can point straight at one screen.
 - **Trends chart**: every metric on one time axis with a day/night sky backdrop and sunrise/sunset markers; scrub with mouse or touch, solo a line, and pick a window from the last minute up to your full retention span. Step back and forth through earlier history with the on-chart controls or the arrow keys. History persists across restarts in a local SQLite store, with a retention window you set and CSV/JSON export under **Settings → History**.
-- **Per-device breakdown**: Device Breakdown page lists multiple inverters behind plant totals (model, status, solar, active power, temperature, charge, health, and every PV string) plus every active Smart Port load (live draw and lifetime energy, nameable in Settings), reachable via optional dashboard button.
+- **Per-device breakdown**: Device Breakdown page lists multiple inverters behind plant totals (model, status, solar, active power, temperature, charge, health, and every PV string) plus every active Smart Port load (live draw and lifetime energy, nameable in Settings, with an optional combined readout on the dashboard, trends, and fullscreen views), reachable via optional dashboard button.
 - **Energy tariffs & cost**: enter your import/export rates and time-of-use windows; the Home tile shows a live running cost (or credit), and its fullscreen breaks down today's supply charge, import, export, credits, and net.
 - **Alerts**: build any number of alerts, each watching a value you choose (gateway reachability, battery charge or health, grid import/export, solar, home usage, outdoor temperature, cost per hour) and routed to an Apple Home contact sensor, a JSON webhook (e.g. ntfy, Pushover, Home Assistant, Discord, etc), or both. Debounced so a single missed poll stays quiet; off until you turn it on.
 - **Themes**: colour presets or full custom palettes, renameable dashboard title, font size slider, all saved server-side so every consuming device matches.
@@ -249,7 +249,9 @@ Each alert routes to **Apple Home**, a **webhook**, or both, set on the alert it
 
 The four dashboard panels show plant-level totals: every inverter and PV string summed into one number. The **Device Breakdown** page (`/devices`) opens them up individually. Each inverter the bridge finds on the gateway gets a device info card with its model, serial, unit ID, running state, live solar and active power, temperature, and own charge and health, plus a bar per PV string carrying that string's watts, volts, and amps.
 
-Anything wired to the gateway's **Smart Port** (a hot water system, pool pump, or other controlled load) gets a card too, showing whether it's drawing right now, its live power, and its lifetime energy. The gateway doesn't share the names you gave loads in the mySigen app, so name them in **Settings → System**; and it doesn't report the relay position, so a load at zero watts reads as Idle, which covers both switched-off and on-but-not-drawing. Because the gateway runs its Smart Port schedules locally, these readings keep flowing even when your internet is down.
+Anything wired to the gateway's **Smart Port** (a hot water system, pool pump, or other controlled load) gets a card too, showing whether it's drawing right now, its live power, and its lifetime energy. The gateway doesn't share the names you gave loads in the mySigen app, so name them in **Settings → Smart Port**; and it doesn't report the relay position, so a load at zero watts reads as Idle, which covers both switched-off and on-but-not-drawing. Because the gateway runs its Smart Port schedules locally, these readings keep flowing even when your internet is down.
+
+The same settings section can put the loads on the dashboard. One switch adds the combined Smart Port draw above the Home tile's total in a dimmed shade (it's part of home consumption, so the small figure reads as "of which"), retitles the tile **Home • Smart Port**, draws a Smart Port line on the trends chart, and extends the Home panel's fullscreen tap-cycle with a named readout and a plug glyph for each detected load.
 
 <p align="center">
   <img src="docs/screenshots/devices-desktop.png" alt="Device Breakdown" width="100%"/>
@@ -290,6 +292,7 @@ The `/api/snapshot` endpoint returns live power flows (solar, battery, grid, and
     "solarThirdParty": 0,
     "home": 6946,
     "homeGeneral": 6945,
+    "smartPort": 4463,
     "grid": 4695,
     "battery": -26,
     "gridDirection": "import",

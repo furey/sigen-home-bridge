@@ -1,6 +1,6 @@
 import {
   ArrowDown, ArrowUp, Battery, BatteryCharging, BatteryFull, BatteryLow, BatteryMedium,
-  Cable, House, Sun, Zap
+  Cable, House, Plug, Sun, Zap
 } from '@lucide/vue'
 import { displayPrefs, themeColors } from './theme.js'
 
@@ -61,6 +61,16 @@ export const METRICS = [
     glyphGap: 'calc(var(--mu) * 1.5)',
     get accent() { return themeColors.home },
     format: (value) => formatPower(value)
+  },
+  {
+    key: 'smartPortPower',
+    slug: 'smart-port',
+    label: 'Smart Port',
+    get unit() { return displayPrefs.powerUnit },
+    icon: Plug,
+    glyphGap: 'calc(var(--mu) * 1.5)',
+    get accent() { return lerpHex(themeColors.home, '#000000', SMART_PORT_DIM) },
+    format: (value) => formatPower(value)
   }
 ]
 
@@ -106,6 +116,11 @@ export const flowAccentFor = (metric, value) =>
   lerpHex(accentFor(metric, value), '#000000', FLOW_ARROW_DIM)
 
 export const FLOW_ARROW_DIM = 0.4
+
+export const smartPortAccentFor = (metric, value) =>
+  lerpHex(accentFor(metric, value), '#000000', SMART_PORT_DIM)
+
+export const SMART_PORT_DIM = 0.4
 
 export const formatPower = (watts, { signed = false } = {}) => {
   const value = signed ? watts : Math.abs(watts)

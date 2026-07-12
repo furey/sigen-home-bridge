@@ -38,6 +38,7 @@ const power = () => ({
   solarThirdParty: state.thirdPartyPvPower,
   home: state.loadPower,
   homeGeneral: state.generalLoadPower,
+  smartPort: state.smartPortPower,
   grid: state.gridPower,
   battery: state.batteryPower,
   gridDirection: flowDirection(state.gridPower, 'import', 'export'),

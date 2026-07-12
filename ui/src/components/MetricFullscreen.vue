@@ -1,12 +1,15 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, RefreshCw } from '@lucide/vue'
+import { ArrowLeft, Plug, RefreshCw } from '@lucide/vue'
 import { useStateStream } from '../composables/useStateStream.js'
 import { useMetricView } from '../composables/useMetricView.js'
 import { useBatteryCharge } from '../composables/useBatteryCharge.js'
 import { useHoverCapable } from '../composables/useHoverCapable.js'
-import { accentFor, directionFor, flowAccentFor, flowIconFor, iconFor, metricByKey } from '../lib/metrics.js'
+import { useSettings } from '../composables/useSettings.js'
+import {
+  accentFor, directionFor, flowAccentFor, flowIconFor, iconFor, metricByKey, smartPortAccentFor
+} from '../lib/metrics.js'
 import BrandMark from './BrandMark.vue'
 
 const props = defineProps({
@@ -15,6 +18,7 @@ const props = defineProps({
 
 const { state } = useStateStream()
 const { viewFor, advance } = useMetricView()
+const { data: settings, loadOnce } = useSettings()
 const batteryCharge = useBatteryCharge()
 const router = useRouter()
 
@@ -41,8 +45,26 @@ const socWidth = computed(() =>
     ? `${Math.max(0, Math.min(100, raw.value))}%`
     : null)
 
-const view = computed(() => viewFor(VIEW_COUNT))
-const toggle = () => advance(VIEW_COUNT)
+const smartLoads = computed(() => state.devices.filter((device) => device.type === 'smartLoad'))
+const smartPortViewsEnabled = computed(() =>
+  props.metricKey === 'loadPower' &&
+  Boolean(settings.smartLoads?.showOnDashboard) &&
+  smartLoads.value.length > 0)
+const views = computed(() => {
+  const base = [{ type: 'detail', key: 'detail' }, { type: 'glyph', key: 'glyph' }]
+  if (!smartPortViewsEnabled.value) return base
+  const loadViews = smartLoads.value.flatMap((load) => [
+    { type: 'loadDetail', key: `load-${load.index}-detail`, load },
+    { type: 'loadGlyph', key: `load-${load.index}-glyph`, load }
+  ])
+  return [...base, ...loadViews]
+})
+const view = computed(() => views.value[viewFor(views.value.length)])
+const toggle = () => advance(views.value.length)
+
+const loadValue = (load) => metric.value.format(load.power)
+const loadColor = (load) => smartPortAccentFor(metric.value, load.power)
+const loadStatus = (load) => (load.power !== 0 ? 'Drawing' : 'Idle')
 
 const hoverCapable = useHoverCapable()
 const overContent = ref(false)
@@ -56,10 +78,11 @@ const onKey = (event) => {
   if (event.key === 'Escape') back()
 }
 
-onMounted(() => window.addEventListener('keydown', onKey))
+onMounted(() => {
+  loadOnce()
+  window.addEventListener('keydown', onKey)
+})
 onUnmounted(() => window.removeEventListener('keydown', onKey))
-
-const VIEW_COUNT = 2
 </script>
 
 <template>
@@ -119,7 +142,7 @@ const VIEW_COUNT = 2
         mode="out-in"
       >
         <div
-          v-if="view === 1"
+          v-if="view.type === 'glyph'"
           key="glyph"
           class="flex transform-gpu items-center justify-center tabular-nums portrait:flex-col portrait:-translate-y-1/8"
           :style="{ color, gap: glyphGap }"
@@ -136,6 +159,41 @@ const VIEW_COUNT = 2
               {{ unitLabel }}
             </span>
           </span>
+        </div>
+
+        <div
+          v-else-if="view.type === 'loadGlyph'"
+          :key="view.key"
+          class="flex transform-gpu items-center justify-center tabular-nums portrait:flex-col portrait:-translate-y-1/8"
+          :style="{ color: loadColor(view.load), gap: metric.glyphGap }"
+        >
+          <Plug
+            class="h-[calc(var(--mu)*16)] w-[calc(var(--mu)*16)]"
+            :stroke-width="1.5"
+          />
+          <span class="flex items-baseline leading-none">
+            <span class="text-[calc(var(--mu)*16)] font-semibold tracking-tight">{{ loadValue(view.load) }}</span>
+            <span class="ml-[calc(var(--mu)*0.5)] text-[calc(var(--mu)*4.5)] font-medium text-zinc-500">
+              {{ unitLabel }}
+            </span>
+          </span>
+        </div>
+
+        <div
+          v-else-if="view.type === 'loadDetail'"
+          :key="view.key"
+          class="flex transform-gpu flex-col items-center portrait:-translate-y-1/12"
+        >
+          <p class="flex items-center gap-2 text-xl text-zinc-400">
+            <Plug class="h-5 w-5" />Smart Port: {{ view.load.name }}
+          </p>
+          <p class="mt-1 text-sm uppercase tracking-widest text-zinc-500">
+            {{ loadStatus(view.load) }}
+          </p>
+          <p class="my-4 flex items-baseline leading-none tabular-nums" :style="{ color: loadColor(view.load) }">
+            <span class="text-[calc(var(--mu)*20)] font-semibold tracking-tight">{{ loadValue(view.load) }}</span>
+          </p>
+          <p class="text-2xl text-zinc-500">{{ unitLabel }}</p>
         </div>
 
         <div v-else key="detail" class="flex transform-gpu flex-col items-center portrait:-translate-y-1/12">

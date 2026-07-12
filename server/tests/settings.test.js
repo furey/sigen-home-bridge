@@ -189,8 +189,13 @@ describe('history', () => {
 })
 
 describe('smart loads', () => {
-  it('seeds empty labels', () => {
-    expect(loadSettings().smartLoads).toEqual({ labels: {} })
+  it('seeds empty labels and a hidden dashboard readout', () => {
+    expect(loadSettings().smartLoads).toEqual({ showOnDashboard: false, labels: {} })
+  })
+
+  it('persists the dashboard readout toggle', () => {
+    const { smartLoads } = updateSettings({ smartLoads: { showOnDashboard: true } })
+    expect(smartLoads.showOnDashboard).toBe(true)
   })
 
   it('persists labels keyed by slot number', () => {
