@@ -214,6 +214,7 @@ const data = reactive({
   weather: { enabled: true, latitude: null, longitude: null, units: 'celsius', refreshMs: 600000 },
   battery: { capacityKwh: null, reserveSoc: 0, chargeUnit: 'percent' },
   history: { retentionDays: 7 },
+  smartLoads: { labels: {} },
   alerts: { items: [] },
   tariff: {
     showOnDashboard: false,

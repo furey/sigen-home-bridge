@@ -81,7 +81,7 @@
 - **Google Home sensors**: battery and power readings in the Google Home app, reached through a free Cloudflare Tunnel, with per-device names and watt/kW display modes.
 - **Wall-display dashboard**: fullscreen per-metric readouts, adaptive layouts from desktop to phone, and per-view URLs (`/trends`, `/metric/solar`, …) so a kiosk can point straight at one screen.
 - **Trends chart**: every metric on one time axis with a day/night sky backdrop and sunrise/sunset markers; scrub with mouse or touch, solo a line, and pick a window from the last minute up to your full retention span. Step back and forth through earlier history with the on-chart controls or the arrow keys. History persists across restarts in a local SQLite store, with a retention window you set and CSV/JSON export under **Settings → History**.
-- **Per-device breakdown**: Device Breakdown page lists multiple inverters behind plant totals (model, status, solar, active power, temperature, charge, health, and every PV string), reachable via optional dashboard button.
+- **Per-device breakdown**: Device Breakdown page lists multiple inverters behind plant totals (model, status, solar, active power, temperature, charge, health, and every PV string) plus every active Smart Port load (live draw and lifetime energy, nameable in Settings), reachable via optional dashboard button.
 - **Energy tariffs & cost**: enter your import/export rates and time-of-use windows; the Home tile shows a live running cost (or credit), and its fullscreen breaks down today's supply charge, import, export, credits, and net.
 - **Alerts**: build any number of alerts, each watching a value you choose (gateway reachability, battery charge or health, grid import/export, solar, home usage, outdoor temperature, cost per hour) and routed to an Apple Home contact sensor, a JSON webhook (e.g. ntfy, Pushover, Home Assistant, Discord, etc), or both. Debounced so a single missed poll stays quiet; off until you turn it on.
 - **Themes**: colour presets or full custom palettes, renameable dashboard title, font size slider, all saved server-side so every consuming device matches.
@@ -249,6 +249,8 @@ Each alert routes to **Apple Home**, a **webhook**, or both, set on the alert it
 
 The four dashboard panels show plant-level totals: every inverter and PV string summed into one number. The **Device Breakdown** page (`/devices`) opens them up individually. Each inverter the bridge finds on the gateway gets a device info card with its model, serial, unit ID, running state, live solar and active power, temperature, and own charge and health, plus a bar per PV string carrying that string's watts, volts, and amps.
 
+Anything wired to the gateway's **Smart Port** (a hot water system, pool pump, or other controlled load) gets a card too, showing whether it's drawing right now, its live power, and its lifetime energy. The gateway doesn't share the names you gave loads in the mySigen app, so name them in **Settings → System**; and it doesn't report the relay position, so a load at zero watts reads as Idle, which covers both switched-off and on-but-not-drawing. Because the gateway runs its Smart Port schedules locally, these readings keep flowing even when your internet is down.
+
 <p align="center">
   <img src="docs/screenshots/devices-desktop.png" alt="Device Breakdown" width="100%"/>
   <br/><em>Device Breakdown</em>
@@ -264,7 +266,7 @@ Everything the dashboard shows is also a plain JSON request away, so you can bui
 curl http://<host-ip>:5163/api/snapshot
 ```
 
-The `/api/snapshot` endpoint returns live power flows (solar, battery, grid, and home, in watts and signed for direction), battery charge and health, today's and lifetime energy totals, the outdoor weather, any active alerts, a per-device breakdown of each inverter the gateway exposes (model, status, power, temperature, and each PV string), and, once you've entered tariffs, today's cost breakdown and the current rate. The battery time-to-full/empty estimate and the cost figures are computed server-side and included, so a consumer doesn't have to reproduce the dashboard's maths. Every response carries a `schema` version, the units in use, and timestamps:
+The `/api/snapshot` endpoint returns live power flows (solar, battery, grid, and home, in watts and signed for direction), battery charge and health, today's and lifetime energy totals, the outdoor weather, any active alerts, a per-device breakdown of each inverter the gateway exposes (model, status, power, temperature, and each PV string) and each active Smart Port load (name, live draw, lifetime energy), and, once you've entered tariffs, today's cost breakdown and the current rate. The battery time-to-full/empty estimate and the cost figures are computed server-side and included, so a consumer doesn't have to reproduce the dashboard's maths. Every response carries a `schema` version, the units in use, and timestamps:
 
 ```jsonc
 /*
@@ -455,7 +457,7 @@ This project:
 - Is provided as-is with no warranty; use at your own risk.
 
 > [!IMPORTANT]<br>
-> `sigen-home-bridge` was built and tested against the author's personal Sigenergy system: a single SigenStor inverter with rooftop solar and a battery, no EV charger or generator. Beyond the plant-level totals every system reports, the bridge will try to read setups it hasn't yet been tested against e.g. more than one inverter, AC-coupled third-party PV, etc. Those follow Sigenergy's published Modbus map but are unverified on other hardware, and some device types (EV chargers, generators, vehicle-to-home) aren't read yet. If a reading looks wrong on your system, flag it in [Discussions](https://github.com/furey/sigen-home-bridge/discussions).
+> `sigen-home-bridge` was built and tested against the author's personal Sigenergy system: a single SigenStor inverter with rooftop solar, a battery, and a hot water system on the gateway's Smart Port, no EV charger or generator. Beyond the plant-level totals every system reports, the bridge will try to read setups it hasn't yet been tested against e.g. more than one inverter, AC-coupled third-party PV, etc. Those follow Sigenergy's published Modbus map but are unverified on other hardware, and some device types (EV chargers, generators, vehicle-to-home) aren't read yet. If a reading looks wrong on your system, flag it in [Discussions](https://github.com/furey/sigen-home-bridge/discussions).
 
 ## Contributing
 

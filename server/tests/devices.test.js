@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { discoverInverters, readInverter } from '../devices.js'
+import { discoverInverters, readInverter, readSmartLoads } from '../devices.js'
 
 const u16 = (value) => {
   const buffer = Buffer.alloc(2)
@@ -83,6 +83,41 @@ describe('readInverter', () => {
   it('labels an unrecognised running state as unknown', async () => {
     const inverter = await readInverter(fakeClient(liveResponder(9)), device)
     expect(inverter.status).toBe('unknown')
+  })
+})
+
+const smartLoadBlocks = (loads) => {
+  const energy = Buffer.alloc(24 * 4)
+  const power = Buffer.alloc(24 * 4)
+  loads.forEach(({ slot, watts, hundredthsKwh }) => {
+    power.writeInt32BE(watts, slot * 4)
+    energy.writeUInt32BE(hundredthsKwh, slot * 4)
+  })
+  return (unitId, address) => (address === 30098 ? energy : address === 30146 ? power : null)
+}
+
+describe('readSmartLoads', () => {
+  it('returns only slots with lifetime energy or live power', async () => {
+    const responder = smartLoadBlocks([
+      { slot: 0, watts: 4484, hundredthsKwh: 95475 },
+      { slot: 2, watts: 0, hundredthsKwh: 1200 },
+      { slot: 5, watts: -300, hundredthsKwh: 0 }
+    ])
+    const loads = await readSmartLoads(fakeClient(responder))
+    expect(loads).toEqual([
+      { type: 'smartLoad', index: 1, power: 4484, lifetimeEnergy: 954.75 },
+      { type: 'smartLoad', index: 3, power: 0, lifetimeEnergy: 12 },
+      { type: 'smartLoad', index: 6, power: -300, lifetimeEnergy: 0 }
+    ])
+  })
+
+  it('returns an empty list when every slot is zero', async () => {
+    const loads = await readSmartLoads(fakeClient(smartLoadBlocks([])))
+    expect(loads).toEqual([])
+  })
+
+  it('throws when the registers are unsupported', async () => {
+    await expect(readSmartLoads(fakeClient(() => null))).rejects.toThrow('Modbus exception')
   })
 })
 

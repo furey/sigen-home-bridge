@@ -3,7 +3,7 @@ import { getSettings, onSettingsChange } from './settings.js'
 import { resolvePollInterval } from './schedule.js'
 import { state, publish } from './state.js'
 import { recordSample } from './history.js'
-import { discoverInverters, readInverter } from './devices.js'
+import { discoverInverters, readInverter, readSmartLoads } from './devices.js'
 
 export const startModbusPoller = () => {
   onSettingsChange((changed) => {
@@ -57,6 +57,7 @@ const client = new ModbusRTU()
 const connect = async () => {
   const epoch = ++generation
   unsupportedRegisters.clear()
+  smartLoadsSupported = true
   const { host, port, unitId } = getSettings().sigen
   try {
     await client.connectTCP(host, { port })
@@ -126,8 +127,27 @@ const readDevices = async () => {
     }
   }
   client.setID(getSettings().sigen.unitId)
+  results.push(...await readLabelledSmartLoads())
   return results
 }
+
+const readLabelledSmartLoads = async () => {
+  if (!smartLoadsSupported) return []
+  try {
+    const labels = getSettings().smartLoads.labels
+    return (await readSmartLoads(client)).map((load) => ({ ...load, name: smartLoadName(load, labels) }))
+  } catch (error) {
+    if (isModbusException(error)) {
+      smartLoadsSupported = false
+      log('smart-load registers not supported by firmware; skipping')
+    } else {
+      log(`smart load read failed: ${error.message}`)
+    }
+    return []
+  }
+}
+
+const smartLoadName = (load, labels) => labels[load.index] || `Smart load ${load.index}`
 
 const nextPollInterval = () => {
   const { schedule, defaultIntervalMs } = getSettings().poll
@@ -182,6 +202,8 @@ let pollTimer = null
 let generation = 0
 
 let inverters = []
+
+let smartLoadsSupported = true
 
 const unsupportedRegisters = new Set()
 

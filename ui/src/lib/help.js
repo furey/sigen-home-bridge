@@ -200,5 +200,31 @@ export const HELP = {
       { p: 'A string is one chain of solar panels wired into a single input (MPPT tracker) on the inverter. Each row shows that string’s live output.' },
       { p: '**W** is the power it’s making, **V** the voltage across the panels, and **A** the current flowing. Strings facing different directions, or with one partly shaded, will read differently from each other.' }
     ]
+  },
+  smartLoadStatus: {
+    title: 'Smart load status',
+    body: [
+      { p: '**Drawing** means the load is consuming power right now. **Idle** means it isn’t, which could be either the Smart Port relay being off or the appliance being on but not drawing (a hot water system that’s already up to temperature, for example).' },
+      { p: 'The gateway doesn’t report the relay position over Modbus, so the bridge can’t tell those two apart.' }
+    ]
+  },
+  smartLoadPower: {
+    title: 'Smart load power',
+    body: [
+      { p: 'The power this load is drawing through the gateway’s Smart Port right now. It’s read-only: the Sigenergy Modbus interface has no way to switch a Smart Port load, so control stays with the mySigen app and the gateway’s own schedules.' }
+    ]
+  },
+  smartLoadEnergy: {
+    title: 'Lifetime energy',
+    body: [
+      { p: 'The total energy this load has consumed through the Smart Port since it was commissioned. The gateway only exposes this running total, not a daily figure.' }
+    ]
+  },
+  smartLoadNames: {
+    title: 'Smart load names',
+    body: [
+      { p: 'The gateway doesn’t share the names you gave Smart Port loads in the mySigen app, so name them again here. Names apply live on the next poll.' },
+      { p: 'Clear a field to fall back to the default **Smart load N** name.' }
+    ]
   }
 }

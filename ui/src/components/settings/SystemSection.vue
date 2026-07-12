@@ -1,9 +1,10 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Braces, Cpu, DatabaseBackup, Download, RotateCcw, Server, Trash2, Upload } from '@lucide/vue'
 import { useSettings } from '../../composables/useSettings.js'
 import { useSettingsSection } from '../../composables/useSettingsSection.js'
+import { useStateStream } from '../../composables/useStateStream.js'
 import { downloadBlob } from '../../lib/download.js'
 import { delay } from '../../lib/withMinDuration.js'
 import InfoTip from '../InfoTip.vue'
@@ -18,9 +19,14 @@ const DEVICES_BUTTON_MODES = [
 
 const router = useRouter()
 const { data, loadOnce, applyPatch, reset, undismiss } = useSettings()
+const { state } = useStateStream()
 
 const serverPort = ref(5163)
 const devicesButton = ref('auto')
+const smartLoadLabels = ref({})
+
+const detectedSmartLoads = computed(() =>
+  state.devices.filter((device) => device.type === 'smartLoad'))
 const exporting = ref(false)
 const resetting = ref(false)
 const confirmingReset = ref(false)
@@ -42,6 +48,7 @@ onMounted(async () => {
   await loadOnce()
   serverPort.value = data.server.port
   devicesButton.value = data.appearance.devicesButton ?? 'auto'
+  smartLoadLabels.value = { ...data.smartLoads.labels }
   markPristine()
 })
 
@@ -114,14 +121,25 @@ const confirmRestore = async () => {
 }
 
 function snapshot() {
-  return { port: Number(serverPort.value), devicesButton: devicesButton.value }
+  return {
+    port: Number(serverPort.value),
+    devicesButton: devicesButton.value,
+    smartLoadLabels: Object.fromEntries(
+      Object.entries(trimmedLabels()).filter(([, label]) => label))
+  }
 }
 
 function buildPatch() {
   return {
     server: { port: Number(serverPort.value) },
-    appearance: { devicesButton: devicesButton.value }
+    appearance: { devicesButton: devicesButton.value },
+    smartLoads: { labels: trimmedLabels() }
   }
+}
+
+function trimmedLabels() {
+  return Object.fromEntries(
+    Object.entries(smartLoadLabels.value).map(([slot, label]) => [slot, (label ?? '').trim()]))
 }
 </script>
 
@@ -157,7 +175,7 @@ function buildPatch() {
     <div class="flex items-center justify-between gap-4">
       <div>
         <p class="text-sm text-zinc-300">Device breakdown</p>
-        <p class="text-xs text-zinc-500 !text-pretty">Live per-inverter status, power, and PV-string detail.</p>
+        <p class="text-xs text-zinc-500 !text-pretty">Live inverter and Smart Port load detail.</p>
       </div>
       <button class="flex items-center gap-1 px-4 py-2 text-sm rounded-xl bg-zinc-800 hover:bg-zinc-700" @click="openDevices">
         <Cpu class="w-4 h-4" />Open
@@ -179,6 +197,26 @@ function buildPatch() {
         >
           {{ mode.label }}
         </button>
+      </div>
+    </div>
+    <div v-if="detectedSmartLoads.length" class="pt-4 mt-4 border-t border-zinc-800">
+      <div class="flex items-center justify-between mb-1">
+        <p class="text-sm text-zinc-400">Smart load names</p>
+        <InfoTip topic="smartLoadNames" align="right" />
+      </div>
+      <p class="mb-3 text-xs text-zinc-500 !text-pretty">
+        Name the loads on your gateway's Smart Port. Applies live; no restart needed.
+      </p>
+      <div class="space-y-3">
+        <label v-for="load in detectedSmartLoads" :key="load.index" class="block">
+          <span class="block mb-1 text-sm text-zinc-400">Load {{ load.index }}</span>
+          <input
+            v-model="smartLoadLabels[load.index]"
+            type="text"
+            :placeholder="`Smart load ${load.index}`"
+            class="w-full px-3 py-2 rounded-lg bg-zinc-800"
+          />
+        </label>
       </div>
     </div>
   </section>

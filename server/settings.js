@@ -79,7 +79,7 @@ export const onSettingsChange = (listener) => {
 }
 
 const SECTIONS = [
-  'sigen', 'poll', 'weather', 'battery', 'tariff', 'history',
+  'sigen', 'poll', 'weather', 'battery', 'tariff', 'history', 'smartLoads',
   'alerts', 'homekit', 'server', 'google', 'appearance', 'security'
 ]
 
@@ -95,6 +95,7 @@ const defaults = () => ({
   battery: defaultBattery(),
   tariff: defaultTariff(),
   history: { ...config.history },
+  smartLoads: { labels: {} },
   alerts: defaultAlerts(),
   homekit: { ...config.homekit, labels: defaultLabels() },
   server: { ...config.server },
@@ -224,6 +225,7 @@ const mergeSections = (base, patch) => ({
   weather: { ...base.weather, ...patch?.weather },
   battery: { ...base.battery, ...patch?.battery },
   history: { ...base.history, ...patch?.history },
+  smartLoads: { labels: { ...base.smartLoads.labels, ...patch?.smartLoads?.labels } },
   alerts: { items: patch?.alerts?.items ?? base.alerts.items },
   tariff: {
     showOnDashboard: patch?.tariff?.showOnDashboard ?? base.tariff.showOnDashboard,
@@ -276,6 +278,7 @@ const validate = (settings) => ({
   battery: validBattery(settings.battery),
   tariff: validTariff(settings.tariff),
   history: validHistory(settings.history),
+  smartLoads: validSmartLoads(settings.smartLoads),
   alerts: validAlerts(settings.alerts),
   homekit: validHomekit(settings.homekit),
   server: validServer(settings.server),
@@ -326,6 +329,23 @@ const validRetentionDays = (value) => {
     throw badRequest(`history retention must be an integer between 1 and ${MAX_RETENTION_DAYS} days`)
   }
   return value
+}
+
+const validSmartLoads = ({ labels } = {}) => ({ labels: validSmartLoadLabels(labels) })
+
+const validSmartLoadLabels = (labels) => {
+  if (labels === undefined || labels === null) return {}
+  if (typeof labels !== 'object' || Array.isArray(labels)) {
+    throw badRequest('smart load labels must be an object keyed by slot number')
+  }
+  const entries = Object.entries(labels).map(([key, value]) => {
+    const slot = Number(key)
+    if (!Number.isInteger(slot) || slot < 1 || slot > MAX_SMART_LOADS) {
+      throw badRequest(`smart load label keys must be slot numbers between 1 and ${MAX_SMART_LOADS}`)
+    }
+    return [String(slot), validText(value, '', `smart load ${slot} label`)]
+  })
+  return Object.fromEntries(entries.filter(([, label]) => label))
 }
 
 const validAlerts = ({ items }) => ({ items: validAlertItems(items) })
@@ -698,6 +718,8 @@ const MAX_RESERVE_SOC = 99
 const MAX_RETENTION_DAYS = 90
 
 const MAX_ALERTS = 24
+
+const MAX_SMART_LOADS = 24
 
 const MAX_POWER_DECIMALS = 3
 

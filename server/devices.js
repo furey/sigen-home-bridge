@@ -28,6 +28,22 @@ export const readInverter = async (client, device) => {
   }
 }
 
+export const readSmartLoads = async (client) => {
+  const energy = await read(client, SMART_LOAD_ENERGY_BLOCK)
+  const power = await read(client, SMART_LOAD_POWER_BLOCK)
+  return Array.from({ length: SMART_LOAD_SLOTS }, (_, slot) => buildSmartLoad({ energy, power, slot }))
+    .filter(smartLoadPresent)
+}
+
+const buildSmartLoad = ({ energy, power, slot }) => ({
+  type: 'smartLoad',
+  index: slot + 1,
+  power: power.readInt32BE(slot * SMART_LOAD_BYTES),
+  lifetimeEnergy: round(energy.readUInt32BE(slot * SMART_LOAD_BYTES) / ENERGY_SCALE, 2)
+})
+
+const smartLoadPresent = (load) => load.lifetimeEnergy > 0 || load.power !== 0
+
 const identify = async (client, unitId) => {
   try {
     client.setID(unitId)
@@ -96,6 +112,16 @@ const CURRENT_SCALE = 100
 const TEMP_SCALE = 10
 
 const PERCENT_SCALE = 10
+
+const SMART_LOAD_SLOTS = 24
+
+const SMART_LOAD_BYTES = 4
+
+const ENERGY_SCALE = 100
+
+const SMART_LOAD_ENERGY_BLOCK = { address: 30098, length: SMART_LOAD_SLOTS * 2 }
+
+const SMART_LOAD_POWER_BLOCK = { address: 30146, length: SMART_LOAD_SLOTS * 2 }
 
 const STRING_BLOCK = 31027
 

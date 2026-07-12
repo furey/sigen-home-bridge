@@ -1,9 +1,9 @@
 <script setup>
 import { computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, BatteryFull, Cpu, Gauge, HeartPulse, Settings, Sun, Thermometer } from '@lucide/vue'
+import { ArrowLeft, BatteryFull, Cpu, Gauge, HeartPulse, Plug, Settings, Sun, Thermometer } from '@lucide/vue'
 import { useStateStream } from '../composables/useStateStream.js'
-import { categoryAccentFor, formatPower, metricByKey } from '../lib/metrics.js'
+import { accentFor, categoryAccentFor, formatPower, metricByKey } from '../lib/metrics.js'
 import { displayPrefs } from '../lib/theme.js'
 import BrandMark from './BrandMark.vue'
 import InfoTip from './InfoTip.vue'
@@ -22,9 +22,12 @@ const { state, connected } = useStateStream()
 const router = useRouter()
 
 const solar = metricByKey('pvPower')
+const home = metricByKey('loadPower')
 const powerUnit = computed(() => displayPrefs.powerUnit)
 
 const inverters = computed(() => state.devices.filter((device) => device.type === 'inverter'))
+const smartLoads = computed(() => state.devices.filter((device) => device.type === 'smartLoad'))
+const hasDevices = computed(() => inverters.value.length > 0 || smartLoads.value.length > 0)
 
 const lastUpdated = computed(() =>
   state.lastUpdated
@@ -39,6 +42,10 @@ const statusStyle = (status) => STATUS_STYLES[status] ?? STATUS_STYLES.unknown
 const solarAccent = (watts) => categoryAccentFor(solar, watts)
 const activeLabel = (watts) => `${formatPower(watts, { signed: true })} ${powerUnit.value}`
 const isProducing = (device) => device.solarPower > 0
+const loadAccent = (watts) => accentFor(home, watts)
+const isDrawing = (load) => load.power !== 0
+const loadStyle = (load) => (isDrawing(load) ? STATUS_STYLES.running : STATUS_STYLES.standby)
+const energyLabel = (kwh) => (kwh >= 1000 ? Math.round(kwh).toLocaleString() : kwh)
 const peakStringPower = (strings) => Math.max(1, ...strings.map((string) => string.power))
 const stringWidth = (string, strings) =>
   `${Math.min(100, (string.power / peakStringPower(strings)) * 100)}%`
@@ -87,7 +94,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
     </header>
 
     <div class="flex-1">
-      <section v-if="inverters.length" class="flex flex-col gap-4">
+      <section v-if="hasDevices" class="flex flex-col gap-4">
         <article
           v-for="device in inverters"
           :key="device.unitId"
@@ -183,13 +190,66 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
             </ul>
           </div>
         </article>
+
+        <article
+          v-for="load in smartLoads"
+          :key="`smartLoad-${load.index}`"
+          class="p-5 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 text-zinc-200">
+                <Plug class="w-4 h-4 shrink-0 text-zinc-400" />
+                <span class="font-medium truncate">{{ load.name }}</span>
+              </div>
+              <p class="mt-1 text-xs truncate text-zinc-500">
+                Smart Port · Load {{ load.index }}
+              </p>
+            </div>
+            <span class="flex items-center gap-1.5 shrink-0">
+              <span
+                class="rounded-full px-2.5 py-0.5 text-xs font-medium"
+                :class="loadStyle(load)"
+              >
+                {{ isDrawing(load) ? 'Drawing' : 'Idle' }}
+              </span>
+              <InfoTip topic="smartLoadStatus" align="right" />
+            </span>
+          </div>
+
+          <div class="mt-5">
+            <div class="flex items-baseline gap-2">
+              <Plug class="self-center w-5 h-5" :style="{ color: loadAccent(load.power) }" />
+              <span
+                class="text-4xl font-semibold tabular-nums"
+                :style="{ color: loadAccent(load.power) }"
+              >
+                {{ formatPower(load.power, { signed: true }) }}
+              </span>
+              <span class="text-sm text-zinc-500">{{ powerUnit }}</span>
+              <InfoTip topic="smartLoadPower" />
+            </div>
+            <p v-if="!isDrawing(load)" class="mt-1 text-xs text-zinc-600">
+              No draw right now
+            </p>
+          </div>
+
+          <dl class="grid grid-cols-2 mt-5 gap-x-6 gap-y-3 sm:grid-cols-4">
+            <div>
+              <dt class="flex items-center gap-1 text-xs text-zinc-500">
+                <Gauge class="w-3.5 h-3.5" />Lifetime energy<InfoTip topic="smartLoadEnergy" />
+              </dt>
+              <dd class="mt-0.5 tabular-nums text-zinc-200">{{ energyLabel(load.lifetimeEnergy) }} kWh</dd>
+            </div>
+          </dl>
+        </article>
       </section>
 
       <div v-else class="flex flex-col items-center justify-center h-full gap-3 text-center">
         <Cpu class="w-10 h-10 text-zinc-700" />
         <p class="text-zinc-400">No devices discovered</p>
         <p class="max-w-sm text-sm text-zinc-600 text-pretty">
-          Inverters appear here once the bridge discovers them on the gateway.
+          Inverters and Smart Port loads appear here once the bridge discovers them on the gateway.
           {{ connected ? 'None were found on this gateway.' : 'The gateway is currently unreachable.' }}
         </p>
       </div>

@@ -188,6 +188,35 @@ describe('history', () => {
   })
 })
 
+describe('smart loads', () => {
+  it('seeds empty labels', () => {
+    expect(loadSettings().smartLoads).toEqual({ labels: {} })
+  })
+
+  it('persists labels keyed by slot number', () => {
+    const { smartLoads } = updateSettings({ smartLoads: { labels: { 1: 'Hot water' } } })
+    expect(smartLoads.labels).toEqual({ 1: 'Hot water' })
+  })
+
+  it('drops a label cleared to blank', () => {
+    updateSettings({ smartLoads: { labels: { 1: 'Hot water', 2: 'Pool pump' } } })
+    const { smartLoads } = updateSettings({ smartLoads: { labels: { 2: '' } } })
+    expect(smartLoads.labels).toEqual({ 1: 'Hot water' })
+  })
+
+  it('rejects a label key outside the slot range', () => {
+    expect(() => updateSettings({ smartLoads: { labels: { 25: 'Nope' } } })).toThrow(/slot numbers/)
+  })
+
+  it('rejects an array labels value', () => {
+    expect(() => updateSettings({ smartLoads: { labels: ['Hot water'] } })).toThrow(/slot/)
+  })
+
+  it('rejects an over-long label', () => {
+    expect(() => updateSettings({ smartLoads: { labels: { 1: 'x'.repeat(65) } } })).toThrow(/64/)
+  })
+})
+
 describe('alerts', () => {
   it('seeds an empty alerts list', () => {
     expect(loadSettings().alerts).toEqual({ items: [] })
