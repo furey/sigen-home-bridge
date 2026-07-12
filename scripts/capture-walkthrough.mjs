@@ -79,11 +79,13 @@ const tour = async (page) => {
 
 const buildFrames = (real) => {
   const base = inverterBase((real.devices && real.devices[0]) || {})
+  const smartLoad = (real.devices || []).find((entry) => entry.type === 'smartLoad') || {}
   return Array.from({ length: FRAME_COUNT }, (_, i) => {
     const ramp = FRAME_COUNT === 1 ? 1 : i / (FRAME_COUNT - 1)
-    const pvPower = Math.round(3900 + ramp * 2250 + Math.sin(i / 2.3) * 70)
-    const loadPower = Math.round(470 + Math.sin(i / 1.6) * 130 + Math.cos(i / 4) * 40)
-    const batteryPower = Math.round(1550 + ramp * 1250 + Math.sin(i / 3.1) * 70)
+    const pvPower = Math.round(5200 + ramp * 1600 + Math.sin(i / 2.3) * 70)
+    const smartPortPower = Math.round(3560 + Math.sin(i / 2.1) * 45)
+    const loadPower = smartPortPower + Math.round(470 + Math.sin(i / 1.6) * 130 + Math.cos(i / 4) * 40)
+    const batteryPower = Math.round(900 + ramp * 400 + Math.sin(i / 3.1) * 70)
     const batterySoc = Number((57.4 + ramp * 9.6).toFixed(1))
     const gridPower = loadPower + batteryPower - pvPower
     const exportPower = -gridPower
@@ -97,6 +99,7 @@ const buildFrames = (real) => {
       outdoorLongitude: null,
       pvPower,
       loadPower,
+      smartPortPower,
       batteryPower,
       gridPower,
       batterySoc,
@@ -111,6 +114,12 @@ const buildFrames = (real) => {
           const voltage = 600 + Math.round(Math.sin(i / 3 + index) * 8)
           return { index: index + 1, power, voltage, current: Number((power / voltage).toFixed(1)) }
         })
+      }, {
+        type: 'smartLoad',
+        index: smartLoad.index || 1,
+        name: smartLoad.name || 'Hot water',
+        power: smartPortPower,
+        lifetimeEnergy: smartLoad.lifetimeEnergy ?? 955.63
       }]
     }
   })
@@ -132,7 +141,8 @@ const STRING_RATIOS = [2100, 1980, 1547]
 const sanitize = (settings) => ({
   ...settings,
   sigen: { ...settings.sigen, host: '192.168.1.50' },
-  homekit: { ...settings.homekit, pin: '•••-••-•••', bind: '' }
+  homekit: { ...settings.homekit, pin: '•••-••-•••', bind: '' },
+  smartLoads: { ...settings.smartLoads, showOnDashboard: true }
 })
 
 const seedPage = ({ frames, frameMs, view }) => {

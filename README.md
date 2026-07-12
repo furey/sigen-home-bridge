@@ -251,7 +251,7 @@ The four dashboard panels show plant-level totals: every inverter and PV string 
 
 Anything wired to the gateway's **Smart Port** (a hot water system, pool pump, or other controlled load) gets a card too, showing whether it's drawing right now, its live power, and its lifetime energy. The gateway doesn't share the names you gave loads in the mySigen app, so name them in **Settings → Smart Port**; and it doesn't report the relay position, so a load at zero watts reads as Idle, which covers both switched-off and on-but-not-drawing. Because the gateway runs its Smart Port schedules locally, these readings keep flowing even when your internet is down.
 
-The same settings section can put the loads on the dashboard. One switch adds the combined Smart Port draw above the Home tile's total in a dimmed shade (it's part of home consumption, so the small figure reads as "of which"), retitles the tile **Home • Smart Port**, draws a Smart Port line on the trends chart, and extends the Home panel's fullscreen tap-cycle with a named readout and a plug glyph for each detected load.
+The same settings section can put the loads on the dashboard. One switch adds the combined Smart Port draw above the Home tile's total in a dimmed shade (it's part of home consumption, so the small figure reads as "of which"), retitles the tile **Home • Smart Port** (condensing to the plug icon alone on narrow screens), draws a Smart Port line on the trends chart, and extends the Home panel's fullscreen tap-cycle with a named readout and a plug glyph for each detected load.
 
 <p align="center">
   <img src="docs/screenshots/devices-desktop.png" alt="Device Breakdown" width="100%"/>
