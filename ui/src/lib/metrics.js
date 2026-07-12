@@ -124,8 +124,10 @@ export const SMART_PORT_DIM = 0.4
 
 export const formatPower = (watts, { signed = false } = {}) => {
   const value = signed ? watts : Math.abs(watts)
-  if (displayPrefs.powerUnit === 'W') return `${Math.round(value)}`
-  return (value / 1000).toFixed(displayPrefs.powerDecimals)
+  const text = displayPrefs.powerUnit === 'W'
+    ? `${Math.round(value)}`
+    : (value / 1000).toFixed(displayPrefs.powerDecimals)
+  return Number(text) === 0 ? text.replace('-', '') : text
 }
 
 const isDisplayZero = (metric, value) => Number(metric.format(value)) === 0
