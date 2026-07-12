@@ -370,6 +370,13 @@ The `/api/snapshot` endpoint returns live power flows (solar, battery, grid, and
           "power": 1187
         }
       ]
+    },
+    {
+      "type": "smartLoad",
+      "index": 1,
+      "name": "Hot water",
+      "power": 4463,
+      "lifetimeEnergy": 955.63
     }
   ],
   "history": {

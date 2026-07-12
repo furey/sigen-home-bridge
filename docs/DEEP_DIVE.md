@@ -168,6 +168,8 @@ All values are input registers (function code `0x04`), read at their raw address
 | `lifetimePv`               | 30088    | 4     | uint64 ÷100 | Cumulative PV generation, kWh                 |
 | `consumedToday`            | 30092    | 2     | uint32 ÷100 | Home consumption since midnight, kWh          |
 | `lifetimeConsumed`         | 30094    | 4     | uint64 ÷100 | Cumulative home consumption, kWh              |
+| smart-load energy block    | 30098    | 48    | uint32 ÷100 | Lifetime energy per Smart Port load, 24 slots of 2 words, kWh |
+| smart-load power block     | 30146    | 48    | int32 W     | Live power per Smart Port load, 24 slots of 2 words |
 | `thirdPartyPvPower`        | 30194    | 2     | int32 W     | Third-party (AC-coupled) solar, 0 without one |
 | `lifetimeBatteryCharge`    | 30200    | 4     | uint64 ÷100 | Cumulative battery charge, kWh                |
 | `lifetimeBatteryDischarge` | 30204    | 4     | uint64 ÷100 | Cumulative battery discharge, kWh             |
