@@ -310,7 +310,7 @@ const lastUpdated = computed(() =>
               </span>
               <span class="text-sm metric-unit text-zinc-600">{{ home.unit }}</span>
             </div>
-            <div class="flex items-baseline justify-between" :class="showSmartPort ? '-mt-1 sm:-mt-0.5' : 'mt-auto'">
+            <div class="flex items-baseline justify-between" :class="showSmartPort ? '-mt-[5px] sm:-mt-0.5' : 'mt-auto'">
               <div
                 class="flex items-baseline gap-1 transition-opacity"
                 :class="{ 'opacity-30': dimmed('home-left') }"
@@ -355,7 +355,7 @@ const lastUpdated = computed(() =>
               </span>
               <span class="text-sm metric-unit text-zinc-600">{{ home.unit }}</span>
             </span>
-            <span class="flex items-baseline gap-1" :class="smartPortOnTile(cell) ? '-mt-1 sm:-mt-0.5' : 'mt-auto'">
+            <span class="flex items-baseline gap-1" :class="smartPortOnTile(cell) ? '-mt-[5px] sm:-mt-0.5' : 'mt-auto'">
               <component
                 :is="flowIconOf(cell.metric)"
                 v-if="flowIconOf(cell.metric)"
