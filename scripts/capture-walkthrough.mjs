@@ -11,6 +11,10 @@ const FRAME_COUNT = Number(process.env.WALKTHROUGH_FRAMES || 34)
 const FRAME_MS = Number(process.env.WALKTHROUGH_FRAME_MS || 1400)
 const DASHBOARD_VIEW = { trends: false, range: '1h', hidden: [] }
 
+const PARK = { x: 597, y: 96 }
+const GLIDE_MS = 780
+const BOOKEND_MS = 2200
+
 const run = async () => {
   const frames = buildFrames(await currentState())
   const browser = await chromium.launch({ args: ['--font-render-hinting=none'] })
@@ -39,43 +43,59 @@ const run = async () => {
   }))
   await context.addInitScript(seedPage, { frames, frameMs: FRAME_MS, view: DASHBOARD_VIEW })
   const page = await context.newPage()
-  await tour(page)
+  const startedAt = Date.now()
+  let settledAt = startedAt
+  try {
+    settledAt = await tour(page)
+  } catch (error) {
+    await page.screenshot({ path: `${OUT}/fail.png` }).catch(() => {})
+    throw error
+  }
   const video = page.video()
   await context.close()
   await video.saveAs(`${OUT}/${NAME}.webm`)
   await video.delete()
   await browser.close()
   console.log('✓', `${OUT}/${NAME}.webm`)
+  console.log(`TOUR_TRIM=${((settledAt - startedAt) / 1000 + 0.4).toFixed(1)}`)
 }
 
 const tour = async (page) => {
-  await open(page, '/', 2200)
-  await dwell(page, 3400)
+  await open(page, '/')
+  await dashboardTile(page).waitFor({ state: 'visible', timeout: 15000 })
+  await parkPointer(page, PARK)
+  const settledAt = Date.now()
+  await dwell(page, BOOKEND_MS)
 
-  await tap(page, page.getByRole('button', { name: /Solar Production/i }), 3000)
+  await tap(page, dashboardTile(page), 2400)
   await back(page)
 
-  await tap(page, page.getByLabel('Open cost fullscreen'), 3000)
+  await tap(page, page.getByLabel('Open cost fullscreen'), 2400)
   await back(page)
 
-  await tap(page, page.getByLabel('Devices'), 3200)
+  await tap(page, page.getByLabel('Devices'), 2200)
   await back(page)
 
-  await tap(page, page.getByLabel('Toggle trends view'), 1600)
+  await tap(page, page.getByLabel('Toggle trends view'), 1200)
   await tap(page, page.getByRole('radio', { name: '24h', exact: true }), 0)
   await page.waitForFunction(() => document.querySelectorAll('svg path').length > 3, { timeout: 9000 })
     .catch(() => {})
-  await dwell(page, 2800)
-  await tap(page, page.getByLabel('Toggle trends view'), 1300)
+  await dwell(page, 2600)
+  await tap(page, page.getByLabel('Toggle trends view'), 1200)
 
-  await tap(page, page.getByLabel('Settings'), 1700)
-  await tap(page, page.getByRole('link', { name: 'Theme', exact: true }), 2500)
-  await tap(page, page.getByRole('link', { name: 'Gateway', exact: true }), 2500)
-  await tap(page, page.getByRole('link', { name: 'Apple Home', exact: true }), 2400)
+  await tap(page, page.getByLabel('Settings'), 1400)
+  await tap(page, page.getByRole('link', { name: 'Theme', exact: true }), 1800)
+  await tap(page, page.getByRole('link', { name: 'Gateway', exact: true }), 1800)
+  await tap(page, page.getByRole('link', { name: 'Apple Home', exact: true }), 1800)
 
   await tap(page, page.getByRole('button', { name: 'Back', exact: true }), 0)
-  await dwell(page, 3200)
+  await dashboardTile(page).waitFor({ state: 'visible', timeout: 12000 }).catch(() => {})
+  await glide(page, PARK.x, PARK.y)
+  await dwell(page, BOOKEND_MS)
+  return settledAt
 }
+
+const dashboardTile = (page) => page.getByRole('button', { name: /Solar Production/i }).first()
 
 const buildFrames = (real) => {
   const base = inverterBase((real.devices && real.devices[0]) || {})
@@ -149,15 +169,26 @@ const seedPage = ({ frames, frameMs, view }) => {
   try { sessionStorage.setItem('sigenSettingsSession', 'walkthrough-session') } catch {}
   try { localStorage.setItem('sigenDashboardView', JSON.stringify(view)) } catch {}
 
-  const ensureRippleLayer = () => {
-    if (!document.getElementById('wt-ripple-style')) {
+  const ensureOverlay = () => {
+    if (!document.getElementById('wt-overlay-style')) {
       const style = document.createElement('style')
-      style.id = 'wt-ripple-style'
+      style.id = 'wt-overlay-style'
       style.textContent = `
-        #wt-ripple-layer { position: fixed; inset: 0; pointer-events: none; z-index: 2147483647; }
+        #wt-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 2147483647; }
+        #wt-pointer {
+          position: fixed; left: 0; top: 0; width: 28px; height: 28px; margin: -14px 0 0 -14px;
+          transform: translate(-120px, -120px); z-index: 2;
+          transition: transform 700ms cubic-bezier(0.25, 0.1, 0.25, 1); will-change: transform;
+        }
+        #wt-pointer-dot {
+          width: 100%; height: 100%; border-radius: 50%;
+          background: rgba(255,255,255,0.45); border: 1px solid rgba(255,255,255,0.9);
+          box-shadow: 0 2px 10px rgba(0,0,0,0.35); transition: transform 180ms ease;
+        }
+        #wt-pointer.wt-pointer-press #wt-pointer-dot { transform: scale(0.85); }
         .wt-click {
           position: fixed; width: 84px; height: 84px; margin: -42px 0 0 -42px; border-radius: 50%;
-          box-sizing: border-box; pointer-events: none;
+          box-sizing: border-box; z-index: 1;
         }
         .wt-click-core {
           border: 5px solid rgba(108,142,222,0.95);
@@ -180,23 +211,47 @@ const seedPage = ({ frames, frameMs, view }) => {
         }`
       document.head.appendChild(style)
     }
-    let layer = document.getElementById('wt-ripple-layer')
-    if (!layer) {
-      layer = document.createElement('div')
-      layer.id = 'wt-ripple-layer'
-      document.body.appendChild(layer)
+    let overlay = document.getElementById('wt-overlay')
+    if (!overlay) {
+      overlay = document.createElement('div')
+      overlay.id = 'wt-overlay'
+      const pointer = document.createElement('div')
+      pointer.id = 'wt-pointer'
+      pointer.innerHTML = '<div id="wt-pointer-dot"></div>'
+      overlay.appendChild(pointer)
+      document.body.appendChild(overlay)
     }
-    return layer
+    return overlay
+  }
+
+  window.__movePointer = (x, y, instant) => {
+    ensureOverlay()
+    const pointer = document.getElementById('wt-pointer')
+    if (instant) {
+      pointer.style.transition = 'none'
+      pointer.style.transform = `translate(${x}px, ${y}px)`
+      pointer.getBoundingClientRect()
+      pointer.style.transition = ''
+      return
+    }
+    pointer.style.transform = `translate(${x}px, ${y}px)`
+  }
+
+  window.__pressPointer = () => {
+    const pointer = document.getElementById('wt-pointer')
+    if (!pointer) return
+    pointer.classList.add('wt-pointer-press')
+    setTimeout(() => pointer.classList.remove('wt-pointer-press'), 220)
   }
 
   window.__ripple = (x, y) => {
-    const layer = ensureRippleLayer()
+    const overlay = ensureOverlay()
     for (const variant of ['wt-click-core', 'wt-click-wave']) {
       const ring = document.createElement('span')
       ring.className = `wt-click ${variant}`
       ring.style.left = `${x}px`
       ring.style.top = `${y}px`
-      layer.appendChild(ring)
+      overlay.appendChild(ring)
       setTimeout(() => ring.remove(), 700)
     }
   }
@@ -225,31 +280,45 @@ const seedPage = ({ frames, frameMs, view }) => {
   window.EventSource = FakeEventSource
 }
 
-const tap = async (page, locator, dwellMs = 1200) => {
+const tap = async (page, locator, dwellMs = 1300) => {
   const target = locator.first()
-  await target.waitFor({ state: 'visible', timeout: 9000 })
+  await target.waitFor({ state: 'visible', timeout: 12000 })
+  await target.scrollIntoViewIfNeeded()
+  await dwell(page, 180)
   const box = await target.boundingBox()
   if (box) {
     const x = Math.round(box.x + box.width / 2)
     const y = Math.round(box.y + box.height / 2)
-    await page.evaluate(({ x, y }) => window.__ripple && window.__ripple(x, y), { x, y })
-    await dwell(page, 170)
+    await glide(page, x, y)
+    await page.evaluate(({ x, y }) => {
+      window.__ripple && window.__ripple(x, y)
+      window.__pressPointer && window.__pressPointer()
+    }, { x, y })
+    await dwell(page, 140)
   }
   await target.click()
   if (dwellMs) await dwell(page, dwellMs)
 }
 
+const glide = async (page, x, y) => {
+  await page.evaluate(({ x, y }) => window.__movePointer && window.__movePointer(x, y), { x, y })
+  await dwell(page, GLIDE_MS)
+}
+
+const parkPointer = (page, { x, y }) =>
+  page.evaluate(({ x, y }) => window.__movePointer && window.__movePointer(x, y, true), { x, y })
+
 const back = (page, dwellMs = 1100) => tap(page, page.getByLabel('Back to dashboard'), dwellMs)
 
 const currentState = async () => (await fetch(`${BASE}/api/state`)).json()
 
-const open = async (page, path, settle = 2200) => {
+const open = async (page, path) => {
   await page.goto(BASE + path, { waitUntil: 'domcontentloaded', timeout: 30000 })
   await page.evaluate(() => document.fonts.load('600 32px "Inter Variable"')).catch(() => {})
   await page.waitForFunction(() => document.fonts.check('600 32px "Inter Variable"'), { timeout: 9000 })
     .catch(() => { console.log('⚠ Inter Variable did not load for', page.url()) })
   await page.evaluate(() => document.fonts.ready.then(() => true)).catch(() => {})
-  await dwell(page, settle)
+  await dwell(page, 300)
 }
 
 const dwell = (page, ms) => page.waitForTimeout(ms)

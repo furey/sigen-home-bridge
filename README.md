@@ -39,7 +39,7 @@
 
 ## Demo
 
-<https://gist.github.com/user-attachments/assets/f2ab82b0-9bfc-45ce-bef9-655ab32c1112>
+<https://gist.github.com/user-attachments/assets/1f0b44a5-0268-4b6c-865c-fa6d1211adcd>
 
 ## What `sigen-home-bridge` is
 

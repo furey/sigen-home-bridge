@@ -7,9 +7,9 @@ SIGEN_URL="${SIGEN_URL%/}"
 PLAYWRIGHT_VERSION="${PLAYWRIGHT_VERSION:-1.60.0}"
 PLAYWRIGHT_IMAGE="${PLAYWRIGHT_IMAGE:-mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-jammy}"
 OUT_NAME="${WALKTHROUGH_NAME:-walkthrough}"
-TRIM_HEAD="${WALKTHROUGH_TRIM_HEAD:-0.5}"
 WEBM="${REPO_ROOT}/${OUT_NAME}.webm"
 MP4="${REPO_ROOT}/${OUT_NAME}.mp4"
+POSTER="${REPO_ROOT}/${OUT_NAME}.jpg"
 HOST_UID=$(id -u)
 HOST_GID=$(id -g)
 
@@ -28,6 +28,8 @@ if ! curl -fsS "$SIGEN_URL/api/state" >/dev/null; then
 fi
 
 echo "[walkthrough] recording $PLAYWRIGHT_IMAGE against $SIGEN_URL"
+DOCKER_LOG=$(mktemp)
+trap 'rm -f "$DOCKER_LOG"' EXIT
 docker run --rm --network host \
   -v "$REPO_ROOT":/work \
   -w /tmp \
@@ -43,13 +45,26 @@ docker run --rm --network host \
     npm install --silent --no-save --no-audit --no-fund playwright@${PLAYWRIGHT_VERSION} 2>&1 | tail -1 && \
     cp /work/scripts/capture-walkthrough.mjs /tmp/capture-walkthrough.mjs && \
     node /tmp/capture-walkthrough.mjs && \
-    chown ${HOST_UID}:${HOST_GID} /work/${OUT_NAME}.webm"
+    chown ${HOST_UID}:${HOST_GID} /work/${OUT_NAME}.webm" \
+  2>&1 | tee "$DOCKER_LOG"
+
+TOUR_TRIM=$(sed -n 's/.*TOUR_TRIM=\([0-9][0-9.]*\).*/\1/p' "$DOCKER_LOG" | tail -1)
+TRIM_HEAD="${WALKTHROUGH_TRIM_HEAD:-${TOUR_TRIM:-0.5}}"
+echo "[walkthrough] head trim ${TRIM_HEAD}s (measured TOUR_TRIM=${TOUR_TRIM:-unset})"
 
 echo "[walkthrough] encoding $MP4"
 ffmpeg -y -loglevel error -ss "$TRIM_HEAD" -i "$WEBM" \
-  -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" \
-  -c:v libx264 -profile:v high -pix_fmt yuv420p -movflags +faststart -an \
+  -an -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" \
+  -c:v libx264 -profile:v high -crf 28 -preset slow \
+  -pix_fmt yuv420p -movflags +faststart \
   "$MP4"
+
+if [ -n "${WALKTHROUGH_POSTER:-}" ]; then
+  echo "[walkthrough] poster frame $POSTER"
+  ffmpeg -y -loglevel error -ss "$TRIM_HEAD" -i "$WEBM" \
+    -frames:v 1 -update 1 -q:v 4 "$POSTER"
+fi
+
 rm -f "$WEBM"
 
 echo "[walkthrough] done. $MP4"
