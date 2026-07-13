@@ -132,7 +132,13 @@ const buildFrames = (real) => {
         strings: STRING_RATIOS.map((watts, index) => {
           const power = Math.round(watts * pvShare)
           const voltage = 600 + Math.round(Math.sin(i / 3 + index) * 8)
-          return { index: index + 1, power, voltage, current: Number((power / voltage).toFixed(1)) }
+          return {
+            index: index + 1,
+            name: STRING_NAMES[index + 1],
+            power,
+            voltage,
+            current: Number((power / voltage).toFixed(1))
+          }
         })
       }, {
         type: 'smartLoad',
@@ -157,12 +163,14 @@ const inverterBase = (device) => ({
 })
 
 const STRING_RATIOS = [2100, 1980, 1547]
+const STRING_NAMES = { 1: 'North array', 2: 'East array', 3: 'Carport' }
 
 const sanitize = (settings) => ({
   ...settings,
   sigen: { ...settings.sigen, host: '192.168.1.50' },
   homekit: { ...settings.homekit, pin: '•••-••-•••', bind: '' },
-  smartLoads: { ...settings.smartLoads, showOnDashboard: true }
+  smartLoads: { ...settings.smartLoads, showOnDashboard: true },
+  solar: { ...settings.solar, stringNames: { 'SGN-2026-000123': STRING_NAMES } }
 })
 
 const seedPage = ({ frames, frameMs, view }) => {

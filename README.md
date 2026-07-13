@@ -258,6 +258,11 @@ The same settings section can put the loads on the dashboard. One switch adds th
   <br/><em>Device Breakdown</em>
 </p>
 
+<p align="center">
+  <img src="docs/screenshots/settings-solar.png" alt="Settings → Solar" width="100%"/>
+  <br/><em>Settings → Solar</em>
+</p>
+
 Open it from the **Devices** button in the dashboard header or from **Settings → System**. The page is read-only and updates over the dashboard's live stream; the same per-device data also feeds the [`/api/snapshot`](#json-api) `devices` array. How discovery works, and which device types aren't read yet, is in [`docs/DEEP_DIVE.md`](docs/DEEP_DIVE.md#multiple-inverters-and-sources).
 
 ## JSON API

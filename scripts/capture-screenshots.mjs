@@ -18,6 +18,9 @@ const PROFILES = {
 const DASHBOARD_VIEW = { trends: false, range: '1h', hidden: [] }
 const TRENDS_VIEW = { trends: true, range: '24h', hidden: [] }
 
+const SAMPLE_SERIAL = 'SGN-2026-000123'
+const STRING_NAMES = { 1: 'North array', 2: 'East array', 3: 'Carport' }
+
 const run = async () => {
   const group = process.argv[2] || 'all'
   const wants = (name) => group === 'all' || group === name
@@ -32,11 +35,16 @@ const run = async () => {
     }
   }
 
-  if (wants('settings')) for (const shot of settingsShots) {
-    const take = shot.kind === 'full'
-      ? () => shotSettingsFull(browser, shot)
-      : () => shotSettingsCrop(browser, shot)
-    await capture(take, shot.file)
+  if (wants('settings')) {
+    const live = await daytimeState()
+    const settings = await stagedSettings()
+    for (const shot of settingsShots) {
+      const inject = shot.inject ? { state: live, settings } : {}
+      const take = shot.kind === 'full'
+        ? () => shotSettingsFull(browser, shot, inject)
+        : () => shotSettingsCrop(browser, shot, inject)
+      await capture(take, shot.file)
+    }
   }
 
   if (wants('wizard')) await capture(() => shotWizard(browser), 'wizard-gateway.png')
@@ -64,6 +72,7 @@ const dataShots = [
 const settingsShots = [
   { kind: 'full', route: '/settings/theme', file: 'settings-appearance.png' },
   { kind: 'full', route: '/settings/gateway', file: 'settings-connection.png', prep: sanitizeGateway },
+  { kind: 'full', route: '/settings/solar', file: 'settings-solar.png', inject: true },
   { kind: 'full', route: '/settings/alerts', file: 'settings-alerts.png' },
   { kind: 'crop', route: '/settings/apple-home', file: 'settings-apple-home.png', prep: sanitizeApple },
   { kind: 'crop', route: '/settings/google-home', file: 'settings-google-home.png' }
@@ -79,9 +88,9 @@ const shotViewport = async (browser, { profile, path, file, view, prep, state, c
   await context.close()
 }
 
-const shotSettingsFull = async (browser, { route, prep, file }) => {
+const shotSettingsFull = async (browser, { route, prep, file }, inject = {}) => {
   const measuring = { viewport: { width: 1280, height: 2400 }, deviceScaleFactor: 2 }
-  const { context, page } = await newPage(browser, measuring, {})
+  const { context, page } = await newPage(browser, measuring, {}, inject.state, inject.settings)
   await open(page, route, 1800)
   if (prep) await prep(page)
   await wait(page, 500)
@@ -94,9 +103,9 @@ const shotSettingsFull = async (browser, { route, prep, file }) => {
   await context.close()
 }
 
-const shotSettingsCrop = async (browser, { route, prep, file }) => {
+const shotSettingsCrop = async (browser, { route, prep, file }, inject = {}) => {
   const cropping = { viewport: { width: 1280, height: 1300 }, deviceScaleFactor: 2 }
-  const { context, page } = await newPage(browser, cropping, {})
+  const { context, page } = await newPage(browser, cropping, {}, inject.state, inject.settings)
   await open(page, route, 1800)
   if (prep) await prep(page)
   await scrollMainToTop(page)
@@ -154,7 +163,7 @@ const daytimeState = async () => {
       ...device,
       type: 'inverter',
       model: device.model || 'SigenStor EC 15.0 TP AU',
-      serial: 'SGN-2026-000123',
+      serial: SAMPLE_SERIAL,
       unitId: device.unitId || 1,
       status: 'running',
       solarPower: pvPower,
@@ -163,9 +172,9 @@ const daytimeState = async () => {
       soc: batterySoc,
       soh: device.soh ?? 100,
       strings: [
-        { index: 1, power: 2100, voltage: 602, current: 3.5 },
-        { index: 2, power: 1980, voltage: 593, current: 3.3 },
-        { index: 3, power: 1547, voltage: 611, current: 2.5 }
+        { index: 1, name: STRING_NAMES[1], power: 2100, voltage: 602, current: 3.5 },
+        { index: 2, name: STRING_NAMES[2], power: 1980, voltage: 593, current: 3.3 },
+        { index: 3, name: STRING_NAMES[3], power: 1547, voltage: 611, current: 2.5 }
       ]
     }, {
       type: 'smartLoad',
@@ -200,11 +209,15 @@ async function selectWidestRange (page) {
 
 function clipToArticle (page) {
   return page.evaluate(() => {
+    const footer = document.querySelector('main footer')
     const articles = [...document.querySelectorAll('article')]
-    const bottom = articles.length
-      ? Math.round(Math.max(...articles.map((article) => article.getBoundingClientRect().bottom))) + 20
-      : window.innerHeight
-    return { x: 0, y: 0, width: window.innerWidth, height: bottom }
+    const articleBottom = articles.length
+      ? Math.max(...articles.map((article) => article.getBoundingClientRect().bottom))
+      : 0
+    const bottom = footer
+      ? Math.round(Math.max(articleBottom, footer.getBoundingClientRect().bottom)) + 12
+      : Math.round(articleBottom) + 20 || window.innerHeight
+    return { x: 0, y: 0, width: window.innerWidth, height: Math.min(bottom, window.innerHeight) }
   })
 }
 
@@ -230,7 +243,11 @@ const mainBox = (page) => page.evaluate(() => {
 
 const stagedSettings = async () => {
   const real = await (await fetch(`${BASE}/api/settings`)).json()
-  return { ...real, smartLoads: { ...real.smartLoads, showOnDashboard: true } }
+  return {
+    ...real,
+    smartLoads: { ...real.smartLoads, showOnDashboard: true },
+    solar: { ...real.solar, stringNames: { [SAMPLE_SERIAL]: STRING_NAMES } }
+  }
 }
 
 const newPage = async (browser, profile, view, state, settings) => {
