@@ -215,6 +215,7 @@ const data = reactive({
   battery: { capacityKwh: null, reserveSoc: 0, chargeUnit: 'percent' },
   history: { retentionDays: 7 },
   smartLoads: { showOnDashboard: false, labels: {} },
+  solar: { stringNames: {} },
   alerts: { items: [] },
   tariff: {
     showOnDashboard: false,

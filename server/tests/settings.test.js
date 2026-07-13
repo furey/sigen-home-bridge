@@ -222,6 +222,51 @@ describe('smart loads', () => {
   })
 })
 
+describe('solar string names', () => {
+  it('seeds empty string names', () => {
+    expect(loadSettings().solar).toEqual({ stringNames: {} })
+  })
+
+  it('persists names nested by inverter then string number', () => {
+    const { solar } = updateSettings({ solar: { stringNames: { PERSIST: { 1: 'North Roof' } } } })
+    expect(solar.stringNames.PERSIST).toEqual({ 1: 'North Roof' })
+  })
+
+  it('keeps strings on different inverters separate', () => {
+    updateSettings({ solar: { stringNames: { SEPA: { 1: 'North Roof' } } } })
+    const { solar } = updateSettings({ solar: { stringNames: { SEPB: { 1: 'Garage' } } } })
+    expect(solar.stringNames.SEPA).toEqual({ 1: 'North Roof' })
+    expect(solar.stringNames.SEPB).toEqual({ 1: 'Garage' })
+  })
+
+  it('merges a new string into an existing inverter without dropping siblings', () => {
+    updateSettings({ solar: { stringNames: { MERGE: { 1: 'North Roof' } } } })
+    const { solar } = updateSettings({ solar: { stringNames: { MERGE: { 2: 'Garage' } } } })
+    expect(solar.stringNames.MERGE).toEqual({ 1: 'North Roof', 2: 'Garage' })
+  })
+
+  it('drops a name cleared to blank and prunes the emptied inverter', () => {
+    updateSettings({ solar: { stringNames: { PRUNE: { 1: 'North Roof' } } } })
+    const { solar } = updateSettings({ solar: { stringNames: { PRUNE: { 1: '' } } } })
+    expect(solar.stringNames.PRUNE).toBeUndefined()
+  })
+
+  it('rejects a string key outside the strings range', () => {
+    expect(() => updateSettings({ solar: { stringNames: { RANGE: { 5: 'Nope' } } } }))
+      .toThrow(/between 1 and 4/)
+  })
+
+  it('rejects a non-object inverter group', () => {
+    expect(() => updateSettings({ solar: { stringNames: { BADGROUP: 'North Roof' } } }))
+      .toThrow(/object keyed by string number/)
+  })
+
+  it('rejects an over-long name', () => {
+    expect(() => updateSettings({ solar: { stringNames: { LONG: { 1: 'x'.repeat(65) } } } }))
+      .toThrow(/64/)
+  })
+})
+
 describe('alerts', () => {
   it('seeds an empty alerts list', () => {
     expect(loadSettings().alerts).toEqual({ items: [] })

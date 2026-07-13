@@ -1,12 +1,13 @@
 import {
   BatteryCharging, BellRing, Cable, CircleDollarSign, Cloud, History, House, LayoutDashboard, Lock,
-  Palette, Plug, Server, Thermometer
+  Palette, Plug, Server, Sun, Thermometer
 } from '@lucide/vue'
 
 export const SETTINGS_SECTIONS = [
   { name: 'settings-dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { name: 'settings-gateway', label: 'Gateway', icon: Cable },
   { name: 'settings-battery', label: 'Battery', icon: BatteryCharging },
+  { name: 'settings-solar', label: 'Solar', icon: Sun },
   { name: 'settings-smart-port', label: 'Smart Port', icon: Plug },
   { name: 'settings-alerts', label: 'Alerts', icon: BellRing },
   { name: 'settings-tariff', label: 'Tariff', icon: CircleDollarSign },

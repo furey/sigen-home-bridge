@@ -119,10 +119,11 @@ const poll = async (epoch) => {
 }
 
 const readDevices = async () => {
+  const stringNames = getSettings().solar.stringNames
   const results = []
   for (const device of inverters) {
     try {
-      results.push(await readInverter(client, device))
+      results.push(withStringNames(await readInverter(client, device), stringNames))
     } catch (error) {
       log(`inverter ${device.unitId} read failed: ${error.message}`)
     }
@@ -131,6 +132,17 @@ const readDevices = async () => {
   results.push(...await readLabelledSmartLoads())
   return results
 }
+
+const withStringNames = (inverter, stringNames) => ({
+  ...inverter,
+  strings: inverter.strings.map((string) =>
+    ({ ...string, name: stringName(inverter, string, stringNames) }))
+})
+
+const stringName = (inverter, string, stringNames) =>
+  stringNames[inverterKey(inverter)]?.[string.index] || `String ${string.index}`
+
+const inverterKey = ({ serial, unitId }) => serial || `unit-${unitId}`
 
 const readLabelledSmartLoads = async () => {
   if (!smartLoadsSupported) return []

@@ -226,5 +226,12 @@ export const HELP = {
       { p: 'The gateway doesn’t share the names you gave Smart Port loads in the mySigen app, so name them again here. Names apply live on the next poll.' },
       { p: 'Clear a field to fall back to the default **Smart load N** name.' }
     ]
+  },
+  solarStringNames: {
+    title: 'Solar string names',
+    body: [
+      { p: 'Rename each PV string from the default **String N** to something you recognise, like North Roof or Garage. The names show on the Devices page and apply live on the next poll.' },
+      { p: 'Names are stored per inverter, so strings on different inverters stay separate. Clear a field to fall back to the default.' }
+    ]
   }
 }

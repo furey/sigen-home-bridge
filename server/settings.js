@@ -79,7 +79,7 @@ export const onSettingsChange = (listener) => {
 }
 
 const SECTIONS = [
-  'sigen', 'poll', 'weather', 'battery', 'tariff', 'history', 'smartLoads',
+  'sigen', 'poll', 'weather', 'battery', 'tariff', 'history', 'smartLoads', 'solar',
   'alerts', 'homekit', 'server', 'google', 'appearance', 'security'
 ]
 
@@ -96,6 +96,7 @@ const defaults = () => ({
   tariff: defaultTariff(),
   history: { ...config.history },
   smartLoads: { showOnDashboard: false, labels: {} },
+  solar: { stringNames: {} },
   alerts: defaultAlerts(),
   homekit: { ...config.homekit, labels: defaultLabels() },
   server: { ...config.server },
@@ -229,6 +230,7 @@ const mergeSections = (base, patch) => ({
     showOnDashboard: patch?.smartLoads?.showOnDashboard ?? base.smartLoads.showOnDashboard,
     labels: { ...base.smartLoads.labels, ...patch?.smartLoads?.labels }
   },
+  solar: { stringNames: mergeStringNames(base.solar.stringNames, patch?.solar?.stringNames) },
   alerts: { items: patch?.alerts?.items ?? base.alerts.items },
   tariff: {
     showOnDashboard: patch?.tariff?.showOnDashboard ?? base.tariff.showOnDashboard,
@@ -273,6 +275,18 @@ const mergeSections = (base, patch) => ({
   security: { passcode: patch?.security?.passcode ?? base.security.passcode }
 })
 
+const mergeStringNames = (base = {}, patch) => {
+  if (!isPlainObject(patch)) return base
+  const merged = { ...base }
+  for (const [key, group] of Object.entries(patch)) {
+    merged[key] = isPlainObject(group) ? { ...base[key], ...group } : group
+  }
+  return merged
+}
+
+const isPlainObject = (value) =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
 const validate = (settings) => ({
   setupComplete: Boolean(settings.setupComplete),
   sigen: validSigen(settings.sigen),
@@ -282,6 +296,7 @@ const validate = (settings) => ({
   tariff: validTariff(settings.tariff),
   history: validHistory(settings.history),
   smartLoads: validSmartLoads(settings.smartLoads),
+  solar: validSolar(settings.solar),
   alerts: validAlerts(settings.alerts),
   homekit: validHomekit(settings.homekit),
   server: validServer(settings.server),
@@ -352,6 +367,40 @@ const validSmartLoadLabels = (labels) => {
     return [String(slot), validText(value, '', `smart load ${slot} label`)]
   })
   return Object.fromEntries(entries.filter(([, label]) => label))
+}
+
+const validSolar = ({ stringNames } = {}) => ({ stringNames: validStringNames(stringNames) })
+
+const validStringNames = (names) => {
+  if (names === undefined || names === null) return {}
+  if (typeof names !== 'object' || Array.isArray(names)) {
+    throw badRequest('solar string names must be an object keyed by inverter')
+  }
+  const groups = Object.entries(names).map(([key, group]) =>
+    [validInverterKey(key), validStringGroup(group, key)])
+  return Object.fromEntries(groups.filter(([, group]) => Object.keys(group).length))
+}
+
+const validInverterKey = (key) => {
+  const trimmed = typeof key === 'string' ? key.trim() : ''
+  if (!trimmed || trimmed.length > MAX_INVERTER_KEY_LENGTH) {
+    throw badRequest('solar string name inverter keys must be non-empty identifiers')
+  }
+  return trimmed
+}
+
+const validStringGroup = (group, key) => {
+  if (typeof group !== 'object' || group === null || Array.isArray(group)) {
+    throw badRequest(`solar string names for ${key} must be an object keyed by string number`)
+  }
+  const entries = Object.entries(group).map(([index, value]) => {
+    const slot = Number(index)
+    if (!Number.isInteger(slot) || slot < 1 || slot > MAX_PV_STRINGS) {
+      throw badRequest(`solar string name keys must be numbers between 1 and ${MAX_PV_STRINGS}`)
+    }
+    return [String(slot), validText(value, '', `solar string ${slot} name`)]
+  })
+  return Object.fromEntries(entries.filter(([, name]) => name))
 }
 
 const validAlerts = ({ items }) => ({ items: validAlertItems(items) })
@@ -726,6 +775,10 @@ const MAX_RETENTION_DAYS = 90
 const MAX_ALERTS = 24
 
 const MAX_SMART_LOADS = 24
+
+const MAX_PV_STRINGS = 4
+
+const MAX_INVERTER_KEY_LENGTH = 64
 
 const MAX_POWER_DECIMALS = 3
 
