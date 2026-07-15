@@ -213,7 +213,7 @@ Google Home support is best-effort: Google's smart-home integrations are cloud-t
 2. In the [Google Home Developer Console](https://console.home.google.com), create a cloud-to-cloud project. Set the fulfillment URL to `https://<your-tunnel-host>/fulfillment` and the OAuth Authorization and Token URLs to `/auth` and `/token` on the same host. Client ID and secret can be any non-empty values; the bundled stub OAuth ignores them.
 3. Set the Auth token in **Settings → Google Home** to any value (the shared bearer the stub returns), then link the project in the Google Home app.
 
-The battery shows up as a proper battery tile (charge level and charging state) via Google's EnergyStorage trait. The four power metrics (solar, grid, home, battery power) have no native Google watt unit, so they ride in on read-only temperature tiles: the number is your live watts, but Google labels it with a degree symbol and rounds to a whole number, the same trade-off the [HomeKit](#apple-home) sensors make. **Settings → Google Home** can rename each device and set how it renders: the battery as a tile or a voice-readable percentage, and the power metrics in watts, kilowatts, or hidden. Details, caveats, and a sequence diagram are in [`docs/DEEP_DIVE.md`](docs/DEEP_DIVE.md#google-home-fulfillment).
+The battery shows up as a proper battery tile (charge level and charging state) via Google's EnergyStorage trait. The power metrics (solar, grid, home, battery power) have no native Google watt unit, so they ride in on read-only temperature tiles: the number is your live watts, but Google labels it with a degree symbol and rounds to a whole number, the same trade-off the [HomeKit](#apple-home) sensors make. **Settings → Google Home** can rename each device and set how it renders: the battery as a tile or a voice-readable percentage, and the power metrics in watts, kilowatts, or hidden. Details, caveats, and a sequence diagram are in [`docs/DEEP_DIVE.md`](docs/DEEP_DIVE.md#google-home-fulfillment).
 
 You set all of it from **Settings → Google Home**: the auth token (write-only, shown as stored once set), the battery and power display modes, and a name for each device. These are read per request, so a rename or new token applies on the next sync; switching a display mode swaps the device's trait, so Google needs a relink to pick that up.
 
@@ -228,7 +228,7 @@ Enter your electricity rates in **Settings → Tariff** and the bridge turns the
 
 One switch turns the figures on. The Home tile splits in two (consumption on the left, cost on the right) and each half opens its own fullscreen. The cost figure shows either today's running net (feed-in and credits minus import and the daily supply charge; the default) or the current per-hour rate. Tapping it opens the full breakdown: import, feed-in, credits, supply, and net. A cost reads plain in orange; a credit shows a leading − in green (a minus means money in your favour), both themeable in **Settings → Theme**.
 
-It also models two less-common credits some plans offer: a flat daily amount for drawing no grid power across a window (an evening-peak "zero-draw" reward), and a bonus rate for the first capped kWh exported in a window each day.
+It also models less-common credits some plans offer: a flat daily amount for drawing no grid power across a window (an evening-peak "zero-draw" reward), and a bonus rate for the first capped kWh exported in a window each day.
 
 <p align="center">
   <img src="docs/screenshots/fullscreen-cost-desktop.png" alt="Cost Estimate Metric View" width="100%"/>
@@ -251,7 +251,7 @@ Each alert routes to **Apple Home**, a **webhook**, or both, set on the alert it
 
 ## Devices
 
-The four dashboard panels show plant-level totals: every inverter and PV string summed into one number. The **Device Breakdown** page (`/devices`) opens them up individually. Each inverter the bridge finds on the gateway gets a device info card with its model, serial, unit ID, running state, live solar and active power, temperature, and own charge and health, plus a bar per PV string carrying that string's watts, volts, and amps. Strings read **String 1**, **String 2**, and so on by default; rename them to whatever you recognise (North Roof, Garage) in **Settings → Solar**. Names are kept per inverter, so strings on different inverters stay separate, and they apply live on every device without a restart.
+The dashboard panels show plant-level totals: every inverter and PV string summed into one number. The **Device Breakdown** page (`/devices`) opens them up individually. Each inverter the bridge finds on the gateway gets a device info card with its model, serial, unit ID, running state, live solar and active power, temperature, and own charge and health, plus a bar per PV string carrying that string's watts, volts, and amps. Strings read **String 1**, **String 2**, and so on by default; rename them to whatever you recognise (North Roof, Garage) in **Settings → Solar**. Names are kept per inverter, so strings on different inverters stay separate, and they apply live on every device without a restart.
 
 Anything wired to the gateway's **Smart Port** (a hot water system, pool pump, or other controlled load) gets a card too, showing whether it's drawing right now, its live power, and its lifetime energy. The gateway doesn't share the names you gave loads in the mySigen app, so name them in **Settings → Smart Port**; and it doesn't report the relay position, so a load at zero watts reads as Idle, which covers both switched-off and on-but-not-drawing. Because the gateway runs its Smart Port schedules locally, these readings keep flowing even when your internet is down.
 
@@ -410,7 +410,7 @@ For history, `GET /api/history` returns the recent samples behind the trends cha
 The dashboard and its read APIs have no authentication; anyone who can reach the port can view your readings. What you can lock is changing things: set a passcode under **Settings → Security** and the settings API rejects every change that doesn't carry a valid session token, so a guest on your LAN can watch the dashboard but can't edit your settings. Treat it as a deterrent for a shared home network, not real security: there are no user accounts, traffic is plain HTTP, and the readings stay open. Forgot it? Delete `data/settings.json` (or just its `security` block) on the host and restart.
 
 - Don't port-forward or reverse-proxy the raw dashboard to the internet, passcode or not; on its own it has no login. The supported way to reach it from outside your LAN is **Cloudflare Access** in front of the bundled tunnel: a login wall at Cloudflare's edge that gates the hostname to your own email(s), so an unauthenticated visitor is bounced to a sign-in page and the origin is never served to them, no VPN involved. It's free for a personal user and needs a domain on your Cloudflare account; step-by-step in [`docs/DEEP_DIVE.md`](docs/DEEP_DIVE.md#remote-access-with-cloudflare-access).
-- If you run Google Home, its three fulfillment paths (`/fulfillment`, `/auth`, `/token`) have to stay public for Google's servers to reach them (they can't sign in), so a path-scoped Access bypass keeps just those open while the rest of the hostname stays gated. They're guarded only by the shared Google token, so treat that token as a secret. No Google Home means no bypass: gate the whole hostname.
+- If you run Google Home, its fulfillment paths (`/fulfillment`, `/auth`, `/token`) have to stay public for Google's servers to reach them (they can't sign in), so a path-scoped Access bypass keeps just those open while the rest of the hostname stays gated. They're guarded only by the shared Google token, so treat that token as a secret. No Google Home means no bypass: gate the whole hostname.
 - The bridge is read-only against your Sigenergy system, so worst case is exposure of your energy readings, not control of your hardware.
 
 For more detail, see: [`docs/DEEP_DIVE.md`](docs/DEEP_DIVE.md#security-model)
@@ -436,7 +436,7 @@ Architecture diagrams, the Modbus register map, the poller state machine, settin
 
 **The Home app shows degrees instead of kilowatts**
 
-- That's by design; see [Reading the numbers in Apple Home](#reading-the-numbers-in-apple-home).
+- That's by design; see [Apple Home](#apple-home).
 
 **The dashboard tiles froze**
 
