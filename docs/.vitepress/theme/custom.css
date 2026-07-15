@@ -1,0 +1,165 @@
+/*
+  Brand styling for the sigen-home-bridge docs.
+  Palette and font are lifted from the web app (ui/src/style.css, ui/src/lib/theme.js):
+  near-black #09090b canvas, #fafafa text, solar amber accent, energy-flow hues.
+*/
+
+@font-face {
+  font-family: "Inter cv01";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("./fonts/inter-latin-cv01.woff2") format("woff2");
+}
+
+:root {
+  --vp-font-family-base: "Inter cv01", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
+
+  --vp-c-brand-1: #b45309;
+  --vp-c-brand-2: #92400e;
+  --vp-c-brand-3: #d97706;
+  --vp-c-brand-soft: rgba(245, 158, 11, 0.16);
+  --vp-c-brand-softer: rgba(245, 158, 11, 0.08);
+
+  --vp-button-brand-border: transparent;
+  --vp-button-brand-text: #0a0a0a;
+  --vp-button-brand-bg: #f59e0b;
+  --vp-button-brand-hover-border: transparent;
+  --vp-button-brand-hover-text: #0a0a0a;
+  --vp-button-brand-hover-bg: #fbbf24;
+  --vp-button-brand-active-border: transparent;
+  --vp-button-brand-active-text: #0a0a0a;
+  --vp-button-brand-active-bg: #d97706;
+
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: -webkit-linear-gradient(
+    120deg,
+    #f59e0b 20%,
+    #e879f9 55%,
+    #67e8f9
+  );
+  --vp-home-hero-image-background-image: linear-gradient(
+    -45deg,
+    rgba(245, 158, 11, 0.45),
+    rgba(124, 58, 237, 0.4) 50%,
+    rgba(103, 232, 249, 0.4)
+  );
+  --vp-home-hero-image-filter: blur(52px);
+
+  /* Energy-flow hues, reusable in custom blocks and callouts. */
+  --shb-solar: #f59e0b;
+  --shb-grid-import: #67e8f9;
+  --shb-grid-export: #2563eb;
+  --shb-battery-charge: #7c3aed;
+  --shb-battery-discharge: #e879f9;
+  --shb-soc: #22c55e;
+}
+
+.dark {
+  --vp-c-brand-1: #fbbf24;
+  --vp-c-brand-2: #f59e0b;
+  --vp-c-brand-3: #b45309;
+
+  --vp-c-bg: #09090b;
+  --vp-c-bg-alt: #0e0e11;
+  --vp-c-bg-soft: #151518;
+  --vp-c-bg-elv: #151518;
+  --vp-c-bg-elv-mute: #1c1c20;
+
+  --vp-c-gutter: #050506;
+  --vp-c-divider: #27272a;
+  --vp-c-border: #27272a;
+
+  --vp-c-text-1: #fafafa;
+  --vp-c-text-2: #a1a1aa;
+  --vp-c-text-3: #71717a;
+
+  --vp-custom-block-tip-border: transparent;
+  --vp-custom-block-tip-text: #d1fae5;
+  --vp-custom-block-tip-bg: rgba(34, 197, 94, 0.09);
+  --vp-custom-block-tip-code-bg: rgba(34, 197, 94, 0.16);
+}
+
+/* App renders every number tabular so live readings hold their width; carry
+   the same character-variant and tabular figures into code and tables here. */
+body {
+  font-feature-settings: "cv01" 1;
+}
+
+.vp-doc table,
+.vp-doc code,
+.vp-doc kbd,
+kbd {
+  font-feature-settings: "tnum" 1, "cv01" 1;
+}
+
+/* Headings use the web app's tighter tracking (Tailwind tracking-tight,
+   -0.025em) rather than VitePress's looser default spacing. */
+.vp-doc h1,
+.vp-doc h2,
+.vp-doc h3,
+.vp-doc h4,
+.vp-doc h5,
+.vp-doc h6,
+.VPHero .name,
+.VPHero .text,
+.VPFeature .title,
+.VPHomeHero .name,
+h1.title,
+.VPDocOutlineItem {
+  letter-spacing: -0.025em;
+}
+
+.dark .VPHero .name .clip {
+  filter: saturate(1.15);
+}
+
+/* Slightly wider content column reads better for the long reference tables. */
+.VPDoc.has-aside .content-container {
+  max-width: 768px;
+}
+
+/* Home hero: the image slot carries the tablet-framed demo video, so let it
+   grow past the default VPImage box and re-centre the background glow behind it. */
+.VPHero .image {
+  max-width: none;
+}
+
+.VPHero .image-container {
+  transform: none;
+  padding: 0;
+  max-width: 520px;
+}
+
+.VPHero .image-bg {
+  width: 480px;
+  height: 480px;
+  opacity: 0.7;
+}
+
+@media (min-width: 960px) {
+  .VPHero .image-container {
+    max-width: 100%;
+  }
+}
+
+/* Stacked (mobile/tablet) hero: give the tablet video room to breathe below
+   the hero text and actions. */
+@media (max-width: 959px) {
+  .VPHero .image {
+    margin-top: 1.75rem;
+  }
+}
+
+/* Keyboard hints (used on the trends and passcode pages). */
+kbd {
+  display: inline-block;
+  padding: 0.1em 0.45em;
+  border: 1px solid var(--vp-c-divider);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--vp-c-bg-soft);
+  font-size: 0.85em;
+  line-height: 1.2;
+}

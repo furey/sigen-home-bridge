@@ -14,6 +14,10 @@
   <img alt="No auth" src="https://img.shields.io/badge/auth-LAN%20only-8b837e.svg?style=flat-square"/>
 </p>
 
+<p align="center">
+  <a href="https://furey.github.io/sigen-home-bridge/"><strong>Read the documentation →</strong></a>
+</p>
+
 ## Contents
 
 - [Demo](#demo)
@@ -413,7 +417,7 @@ For more detail, see: [`docs/DEEP_DIVE.md`](docs/DEEP_DIVE.md#security-model)
 
 ## Technical deep dive
 
-Architecture diagrams, the Modbus register map, the poller state machine, settings precedence, project layout, local development setup and more are all documented in [`docs/DEEP_DIVE.md`](./docs/DEEP_DIVE.md).
+Architecture diagrams, the Modbus register map, the poller state machine, settings precedence, project layout, local development setup and more are all documented in [`docs/DEEP_DIVE.md`](./docs/DEEP_DIVE.md), and browsable on the [documentation site](https://furey.github.io/sigen-home-bridge/).
 
 ## Troubleshooting
 
