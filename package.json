@@ -22,6 +22,7 @@
     "test": "npm --prefix server test",
     "screenshots": "scripts/capture-screenshots.sh",
     "walkthrough": "scripts/capture-walkthrough.sh",
+    "og": "scripts/generate-og.sh",
     "install:all": "npm install && npm --prefix server install && npm --prefix ui install"
   },
   "volta": {

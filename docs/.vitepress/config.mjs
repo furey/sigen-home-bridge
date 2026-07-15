@@ -3,13 +3,25 @@ import { withMermaid } from 'vitepress-plugin-mermaid'
 
 const repo = 'https://github.com/furey/sigen-home-bridge'
 const site = 'https://furey.github.io/sigen-home-bridge/'
+const description =
+  'Your live Sigenergy data via a local dashboard, Apple Home, and Google Home. Self-hosted, read-only, no cloud account.'
+const ogImage = `${site}og.png`
+const ogImageAlt =
+  'sigen-home-bridge: a live, local dashboard for Sigenergy solar and battery, with Apple Home and Google Home'
+
+const canonicalPath = (relativePath) =>
+  `${site}${relativePath.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, '')}`
+
+const pageTitle = (pageData) =>
+  pageData.frontmatter.layout === 'home' || !pageData.title
+    ? 'sigen-home-bridge'
+    : `${pageData.title} · sigen-home-bridge`
 
 export default withMermaid(defineConfig({
   base: '/sigen-home-bridge/',
   lang: 'en-AU',
   title: 'sigen-home-bridge',
-  description:
-    'Your live Sigenergy data via a local dashboard, Apple Home, and Google Home. Self-hosted, read-only, no cloud account.',
+  description,
   appearance: 'dark',
   cleanUrls: true,
   lastUpdated: true,
@@ -25,14 +37,32 @@ export default withMermaid(defineConfig({
     ['meta', { name: 'color-scheme', content: 'dark light' }],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:site_name', content: 'sigen-home-bridge' }],
-    ['meta', { property: 'og:title', content: 'sigen-home-bridge' }],
-    ['meta', {
-      property: 'og:description',
-      content: 'Your live Sigenergy data via a local dashboard, Apple Home, and Google Home.'
-    }],
-    ['meta', { property: 'og:url', content: site }],
-    ['meta', { name: 'twitter:card', content: 'summary' }]
+    ['meta', { property: 'og:locale', content: 'en_AU' }],
+    ['meta', { name: 'twitter:card', content: 'summary_large_image' }]
   ],
+
+  transformPageData(pageData) {
+    const canonical = canonicalPath(pageData.relativePath)
+    const title = pageTitle(pageData)
+    const pageDescription =
+      pageData.frontmatter.description || pageData.description || description
+    pageData.frontmatter.head ??= []
+    pageData.frontmatter.head.push(
+      ['link', { rel: 'canonical', href: canonical }],
+      ['meta', { property: 'og:title', content: title }],
+      ['meta', { property: 'og:description', content: pageDescription }],
+      ['meta', { property: 'og:url', content: canonical }],
+      ['meta', { property: 'og:image', content: ogImage }],
+      ['meta', { property: 'og:image:type', content: 'image/png' }],
+      ['meta', { property: 'og:image:width', content: '1200' }],
+      ['meta', { property: 'og:image:height', content: '630' }],
+      ['meta', { property: 'og:image:alt', content: ogImageAlt }],
+      ['meta', { name: 'twitter:title', content: title }],
+      ['meta', { name: 'twitter:description', content: pageDescription }],
+      ['meta', { name: 'twitter:image', content: ogImage }],
+      ['meta', { name: 'twitter:image:alt', content: ogImageAlt }]
+    )
+  },
 
   themeConfig: {
     logo: { light: '/logo-light.svg', dark: '/logo-dark.svg' },
