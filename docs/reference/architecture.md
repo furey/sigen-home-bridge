@@ -1,6 +1,6 @@
 ---
 title: Architecture
-description: One process, one persistent Modbus socket, four registers on a timer, pushed to three consumers. Plus the poller state machine.
+description: One process, one persistent Modbus socket, four registers on a timer, pushed to its consumers. Plus the poller state machine.
 ---
 
 # Architecture
@@ -50,7 +50,7 @@ flowchart TB
   tunnel -->|"POST /fulfillment"| http
 ```
 
-A single process holds one persistent Modbus TCP socket to the gateway and polls four registers on a timer (battery power is derived from them). Each cycle writes to a shared in-memory state object and pushes it to three consumers:
+A single process holds one persistent Modbus TCP socket to the gateway and polls four registers on a timer (battery power is derived from them). Each cycle writes to a shared in-memory state object and pushes it to its consumers:
 
 - **HomeKit** via `hap-nodejs`, advertised over your LAN with Bonjour. Fully local, no cloud.
 - **Google Home** via Smart Home fulfillment over HTTPS (needs a tunnel; see [Google Home fulfillment](/reference/google-home)).
