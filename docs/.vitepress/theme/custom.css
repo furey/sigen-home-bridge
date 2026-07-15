@@ -142,6 +142,12 @@ h1.title,
   .VPHero .image-container {
     max-width: 100%;
   }
+
+  /* Keep the hero copy off the demo frame; the default layout butts the two
+     columns together with no space between them. */
+  .VPHero .container {
+    gap: 40px;
+  }
 }
 
 /* Stacked (mobile/tablet) hero: give the tablet video room to breathe below
@@ -150,6 +156,17 @@ h1.title,
   .VPHero .image {
     margin-top: 1.75rem;
   }
+}
+
+/* Let the browser balance line breaks so no last line is left with a single
+   orphaned word (the CSS behind Tailwind's text-pretty). */
+.VPHero .text,
+.VPHero .tagline,
+.VPFeature .title,
+.VPFeature .details,
+.vp-doc p,
+.vp-doc li {
+  text-wrap: pretty;
 }
 
 /* Keyboard hints (used on the trends and passcode pages). */
