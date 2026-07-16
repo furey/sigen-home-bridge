@@ -152,6 +152,7 @@ const card = (variant) => {
   .tablet {
     position: relative;
     width: 100%;
+    transform: translateX(-12px);
     padding: 17px;
     border-radius: 30px;
     border: 1px solid rgba(255, 255, 255, 0.05);
