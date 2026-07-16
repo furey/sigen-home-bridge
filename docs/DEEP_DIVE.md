@@ -466,6 +466,26 @@ The readings move on camera. `capture-walkthrough.mjs` precomputes a run of ener
 
 The script times its own settle (boot, font load, and the first parked frame) and prints `TOUR_TRIM`; the shell reads that line and trims exactly that many seconds off the head, so the clip opens on a fully rendered dashboard instead of a half-loaded frame. `WALKTHROUGH_TRIM_HEAD` overrides the measurement when you need a manual value. `WALKTHROUGH_FRAMES` and `WALKTHROUGH_FRAME_MS` retune the data sequence; `WALKTHROUGH_TZ` overrides the timezone; `WALKTHROUGH_POSTER=1` also writes a `walkthrough.jpg` poster from the same trimmed head. To publish, drag the mp4 into a GitHub issue or PR comment and paste the attachment URL into the README's Demo section.
 
+## Generating the social card
+
+`scripts/generate-og.sh` (`npm run og`) renders the Open Graph image that shows up when the documentation link is shared: `docs/public/og.png`, a 1200×630 card on the near-black canvas carrying the white brand mark, the headline (in the brand gradient with **Sigenergy** picked out in white), the tagline, the site URL, and the `dashboard-desktop.png` screenshot in the same tablet frame the home page uses, lit from behind by a radial brand glow. It runs the same Playwright Docker image as the screenshots, with the same `--font-render-hinting=none` flag, but builds a self-contained HTML template inside `generate-og.mjs` with the Inter font, the logo, and the dashboard screenshot inlined as data URIs. It reads the committed screenshot rather than a live instance, so unlike the screenshots and the walkthrough it needs neither a running bridge nor `SIGEN_URL`:
+
+```sh
+npm run og
+```
+
+`OG_VARIANT` chooses the headline treatment: `a`, the default, sets the headline in the gradient with **Sigenergy** in white; `b` flips that to a white headline with **Sigenergy** in the gradient; and `both` writes `og-a.png` and `og-b.png` next to the output so you can compare them.
+
+```sh
+# White headline, Sigenergy in the gradient
+OG_VARIANT=b npm run og
+
+# Render both treatments side by side into tmp/
+OG_VARIANT=both OG_OUT=tmp/og.png npm run og
+```
+
+The per-page tags live in `docs/.vitepress/config.mjs`, where a `transformPageData` hook adds the Open Graph and Twitter Card meta to every page (an absolute image URL, `twitter:card` set to `summary_large_image`, a canonical link, and the page's own title and description), so a shared link renders the card under the right heading. Facebook, LinkedIn, and X cache a URL the first time they scrape it, so after changing the card you have to re-fetch the link through their sharing debuggers, or add a throwaway `?v=2`, before the new image shows.
+
 ## Project layout
 
 ```
@@ -521,6 +541,7 @@ Run from the repository root.
 | `npm run probe`       | Read the gateway once and print decoded values                     |
 | `npm run screenshots` | Recapture the README screenshots (Docker + Playwright)             |
 | `npm run walkthrough` | Record the README walkthrough video (Docker + Playwright + ffmpeg) |
+| `npm run og`          | Regenerate the docs social preview card (Docker + Playwright)       |
 
 ## Verifying the gateway
 
