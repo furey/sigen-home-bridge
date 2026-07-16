@@ -4,23 +4,32 @@ import { dirname } from 'node:path'
 
 const REPO = process.env.OG_REPO || '/work'
 const OUT = process.env.OG_OUT || `${REPO}/docs/public/og.png`
+const VARIANT = process.env.OG_VARIANT || 'a'
 const WIDTH = 1200
 const HEIGHT = 630
 
 const generate = async () => {
   const browser = await chromium.launch({ args: ['--font-render-hinting=none'] })
-  const context = await browser.newContext({
-    viewport: { width: WIDTH, height: HEIGHT },
-    deviceScaleFactor: 1
-  })
-  const page = await context.newPage()
-  await page.setContent(card(), { waitUntil: 'load' })
-  await waitForInter(page)
-  mkdirSync(dirname(OUT), { recursive: true })
-  await page.screenshot({ path: OUT, type: 'png', clip: { x: 0, y: 0, width: WIDTH, height: HEIGHT } })
+  for (const { variant, out } of targets()) {
+    const context = await browser.newContext({
+      viewport: { width: WIDTH, height: HEIGHT },
+      deviceScaleFactor: 1
+    })
+    const page = await context.newPage()
+    await page.setContent(card(variant), { waitUntil: 'load' })
+    await waitForInter(page)
+    mkdirSync(dirname(out), { recursive: true })
+    await page.screenshot({ path: out, type: 'png', clip: { x: 0, y: 0, width: WIDTH, height: HEIGHT } })
+    await context.close()
+    console.log(`[og] wrote ${out} (variant ${variant})`)
+  }
   await browser.close()
-  console.log(`[og] wrote ${OUT}`)
 }
+
+const targets = () =>
+  VARIANT === 'both'
+    ? ['a', 'b'].map((variant) => ({ variant, out: `${dirname(OUT)}/og-${variant}.png` }))
+    : [{ variant: VARIANT, out: OUT }]
 
 const waitForInter = async (page) => {
   await page.evaluate(() => document.fonts.load('700 60px "Inter cv01"'))
@@ -30,10 +39,15 @@ const waitForInter = async (page) => {
   await page.evaluate(() => document.fonts.ready)
 }
 
-const card = () => {
+const headline = (variant) =>
+  variant === 'b'
+    ? '<h1 class="headline">Your <span class="grad">Sigenergy</span> data,<br>live and local.</h1>'
+    : '<h1 class="headline grad">Your <span class="solid">Sigenergy</span> data,<br>live and local.</h1>'
+
+const card = (variant) => {
   const font = base64(`${REPO}/docs/.vitepress/theme/fonts/inter-latin-cv01.woff2`)
   const shot = base64(`${REPO}/docs/screenshots/dashboard-desktop.png`)
-  const logo = readFileSync(`${REPO}/docs/public/logo.svg`, 'utf8').replace(/<\?xml.*?\?>/s, '').trim()
+  const logo = readFileSync(`${REPO}/docs/public/logo-dark.svg`, 'utf8').replace(/<\?xml.*?\?>/s, '').trim()
   return `<!doctype html>
 <html lang="en-AU">
 <head>
@@ -105,12 +119,17 @@ const card = () => {
     line-height: 1.08;
     font-weight: 700;
     letter-spacing: -0.03em;
+    color: #fafafa;
+  }
+  .headline.grad,
+  .headline .grad {
     background: linear-gradient(120deg, #f59e0b 20%, #e879f9 55%, #67e8f9);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
     filter: saturate(1.15);
   }
+  .headline .solid { color: #fafafa; }
   .sub {
     margin-top: 22px;
     max-width: 19ch;
@@ -178,7 +197,7 @@ const card = () => {
     <div class="left">
       <div class="brand">${logo}<span class="name">sigen-home-bridge</span></div>
       <div>
-        <h1 class="headline">Your Sigenergy data,<br>live and local.</h1>
+        ${headline(variant)}
         <p class="sub">Self-hosted, read-only, no cloud account.</p>
       </div>
       <p class="url">furey.github.io/<b>sigen-home-bridge</b></p>

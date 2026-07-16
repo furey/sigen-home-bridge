@@ -20,6 +20,7 @@ docker run --rm \
   -v "$REPO_ROOT":/work \
   -w /tmp \
   -e OG_OUT="/work/${OUT_FILE}" \
+  -e OG_VARIANT="${OG_VARIANT:-a}" \
   "$PLAYWRIGHT_IMAGE" \
   bash -c "npm init -y >/dev/null && \
     npm install --silent --no-save --no-audit --no-fund playwright@${PLAYWRIGHT_VERSION} 2>&1 | tail -1 && \
