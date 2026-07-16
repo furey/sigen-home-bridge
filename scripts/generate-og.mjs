@@ -58,20 +58,25 @@ const card = () => {
   }
   .glow {
     position: absolute;
-    top: -220px;
-    right: -180px;
-    width: 860px;
-    height: 860px;
+    top: 50%;
+    right: -40px;
+    width: 780px;
+    height: 780px;
+    transform: translateY(-50%);
     border-radius: 50%;
-    background: linear-gradient(-45deg, rgba(245, 158, 11, 0.5), rgba(124, 58, 237, 0.42) 50%, rgba(103, 232, 249, 0.42));
-    filter: blur(120px);
-    opacity: 0.6;
+    background: radial-gradient(circle at center,
+      rgba(245, 158, 11, 0.78) 0%,
+      rgba(232, 121, 249, 0.62) 40%,
+      rgba(103, 232, 249, 0.42) 66%,
+      transparent 80%);
+    filter: blur(80px);
+    opacity: 0.8;
   }
   .frame {
     position: relative;
     z-index: 1;
     display: grid;
-    grid-template-columns: 1fr 1.12fr;
+    grid-template-columns: 1fr 1.05fr;
     align-items: center;
     gap: 56px;
     height: 100%;
@@ -96,8 +101,8 @@ const card = () => {
     color: #fafafa;
   }
   .headline {
-    font-size: 60px;
-    line-height: 1.02;
+    font-size: 47px;
+    line-height: 1.08;
     font-weight: 700;
     letter-spacing: -0.03em;
     background: linear-gradient(120deg, #f59e0b 20%, #e879f9 55%, #67e8f9);
@@ -125,15 +130,46 @@ const card = () => {
     align-items: center;
     justify-content: center;
   }
-  .shot {
+  .tablet {
+    position: relative;
     width: 100%;
-    overflow: hidden;
-    border: 1px solid #27272a;
-    border-radius: 18px;
-    background: #0e0e11;
-    box-shadow: 0 34px 90px -24px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.02);
+    padding: 17px;
+    border-radius: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: linear-gradient(158deg, #26262b 0%, #141417 42%, #0b0b0e 100%);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+      inset 0 1px 1px rgba(255, 255, 255, 0.09),
+      0 40px 70px -26px rgba(0, 0, 0, 0.85),
+      0 14px 30px -16px rgba(0, 0, 0, 0.7);
   }
-  .shot img { display: block; width: 100%; height: auto; }
+  .tablet::before {
+    content: "";
+    position: absolute;
+    top: 8.5px;
+    left: 50%;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle at 35% 32%, #3b3b45, #08080a 75%);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04);
+  }
+  .screen {
+    position: relative;
+    overflow: hidden;
+    border-radius: 13px;
+    background: #09090b;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.7), inset 0 0 24px rgba(0, 0, 0, 0.45);
+  }
+  .screen::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 38%);
+  }
+  .screen img { display: block; width: 100%; height: auto; }
 </style>
 </head>
 <body>
@@ -142,13 +178,13 @@ const card = () => {
     <div class="left">
       <div class="brand">${logo}<span class="name">sigen-home-bridge</span></div>
       <div>
-        <h1 class="headline">Your Sigenergy data, live and local.</h1>
+        <h1 class="headline">Your Sigenergy data,<br>live and local.</h1>
         <p class="sub">Self-hosted, read-only, no cloud account.</p>
       </div>
       <p class="url">furey.github.io/<b>sigen-home-bridge</b></p>
     </div>
     <div class="right">
-      <div class="shot"><img src="data:image/png;base64,${shot}" alt=""></div>
+      <div class="tablet"><div class="screen"><img src="data:image/png;base64,${shot}" alt=""></div></div>
     </div>
   </div>
 </body>
