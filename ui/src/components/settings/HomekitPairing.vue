@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { Check, Copy } from '@lucide/vue'
-import { useSession } from '../../composables/useSession.js'
+import { useSettings } from '../../composables/useSettings.js'
 
 const props = defineProps({ pin: { type: String, default: '' } })
 
@@ -14,14 +14,10 @@ const displayPin = computed(() => draftPin.value || activePin.value)
 const unsaved = computed(() =>
   Boolean(pairing.value && draftPin.value && draftPin.value !== activePin.value))
 
+const { fetchPairing } = useSettings()
+
 onMounted(async () => {
-  try {
-    pairing.value = await (await fetch('/api/homekit/pairing', {
-      headers: useSession().authHeaders()
-    })).json()
-  } catch {
-    pairing.value = { uri: '', pin: '', qr: '' }
-  }
+  pairing.value = await fetchPairing()
 })
 
 const copyUri = async () => {
@@ -35,7 +31,8 @@ const copyUri = async () => {
 
 <template>
   <div v-if="pairing" class="p-4 rounded-xl bg-zinc-900 ring-1 ring-zinc-800">
-    <div v-if="pairing.qr" class="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+    <p v-if="pairing.error" class="text-sm text-amber-400">{{ pairing.error }}</p>
+    <div v-else-if="pairing.qr" class="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
       <img
         :src="pairing.qr"
         alt="HomeKit pairing QR code"

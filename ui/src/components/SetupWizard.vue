@@ -12,7 +12,7 @@ import InfoTip from './InfoTip.vue'
 const STEPS = ['Welcome', 'Gateway', 'Polling', 'Weather', 'HomeKit', 'Google Home', 'Ready']
 
 const router = useRouter()
-const { data, load, save, testGateway, testWeather, dismiss } = useSettings()
+const { data, load, save, testWeather, dismiss } = useSettings()
 
 const step = ref(0)
 const saving = ref(false)
@@ -21,10 +21,9 @@ const saveError = ref('')
 const host = ref('')
 const sigenPort = ref(502)
 const unitId = ref(247)
-const testing = ref(false)
 const testResult = ref(null)
-const { scanning, scanCandidates, scanError, scan, applyCandidate } =
-  useGatewayScan({ host, port: sigenPort, unitId, testResult })
+const { scanning, scanCandidates, scanError, scan, applyCandidate, testing, test, cancelTest } =
+  useGatewayScan({ host, port: sigenPort, unitId, testResult, onScanStart: () => cancelAutoTest() })
 
 const defaultInterval = ref(5)
 const schedule = ref([])
@@ -42,11 +41,15 @@ const hkPort = ref(51826)
 
 const googleToken = ref('')
 
+const autoTestPending = ref(false)
+
 const totalSteps = STEPS.length
 const stepTitle = computed(() => STEPS[step.value])
 const progress = computed(() => `${Math.round((step.value / (totalSteps - 1)) * 100)}%`)
 const isLast = computed(() => step.value === totalSteps - 1)
-const canAdvance = computed(() => step.value !== 1 || testResult.value?.ok === true)
+const gatewayVerified = computed(() =>
+  testResult.value?.ok === true && !testing.value && !autoTestPending.value)
+const canAdvance = computed(() => step.value !== 1 || gatewayVerified.value)
 const tokenPlaceholder = computed(() => (data.googleAuthTokenSet ? '••••• (stored)' : 'auth token'))
 
 const nextLabel = computed(() => {
@@ -74,24 +77,16 @@ onMounted(async () => {
   if (!host.value) scan()
 })
 
-const test = async () => {
-  testing.value = true
-  testResult.value = null
-  testResult.value = await testGateway({
-    host: host.value.trim(),
-    port: Number(sigenPort.value),
-    unitId: Number(unitId.value)
-  })
-  testing.value = false
-}
-
 const AUTO_TEST_DELAY_MS = 600
 let autoTestTimer = null
-const autoTestPending = ref(false)
 
-const scheduleAutoTest = ({ immediate = false } = {}) => {
+const cancelAutoTest = () => {
   clearTimeout(autoTestTimer)
   autoTestPending.value = false
+}
+
+const scheduleAutoTest = ({ immediate = false } = {}) => {
+  cancelAutoTest()
   if (step.value !== 1 || scanning.value || !host.value.trim()) return
   if (immediate) return test()
   autoTestPending.value = true
@@ -102,6 +97,7 @@ const scheduleAutoTest = ({ immediate = false } = {}) => {
 }
 
 watch([host, sigenPort, unitId], () => {
+  cancelTest()
   testResult.value = null
   scanCandidates.value = null
   scheduleAutoTest()
@@ -117,13 +113,16 @@ const runWeatherTest = async () => {
   weatherTesting.value = true
   weatherResult.value = null
   const testUnits = units.value
-  const response = await testWeather({
-    latitude: coord(latitude.value),
-    longitude: coord(longitude.value),
-    units: testUnits
-  })
-  weatherResult.value = { ...response, units: testUnits }
-  weatherTesting.value = false
+  try {
+    const response = await testWeather({
+      latitude: coord(latitude.value),
+      longitude: coord(longitude.value),
+      units: testUnits
+    })
+    weatherResult.value = { ...response, units: testUnits }
+  } finally {
+    weatherTesting.value = false
+  }
 }
 
 const weatherTestTemp = ({ temperature, units }) =>

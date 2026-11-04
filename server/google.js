@@ -27,7 +27,7 @@ const queryResponse = (requestId) => ({
 
 const executeResponse = (requestId, body) => ({
   requestId,
-  payload: { commands: [{ ids: commandIds(body), status: 'SUCCESS', states: { online: true } }] }
+  payload: { commands: [{ ids: commandIds(body), status: 'SUCCESS', states: { online: state.connected } }] }
 })
 
 const syncDevice = ({ key }) => {
@@ -44,7 +44,7 @@ const syncDevice = ({ key }) => {
 }
 
 const deviceState = ({ key }) => ({
-  online: true,
+  online: state.connected,
   status: 'SUCCESS',
   ...renderFor(key).state(state[key], nameFor(key))
 })

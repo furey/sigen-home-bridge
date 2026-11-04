@@ -35,9 +35,12 @@ const runTest = async () => {
   testing.value = true
   result.value = null
   const units = form.units
-  const response = await testWeather({ latitude: coord(form.latitude), longitude: coord(form.longitude), units })
-  result.value = { ...response, units }
-  testing.value = false
+  try {
+    const response = await testWeather({ latitude: coord(form.latitude), longitude: coord(form.longitude), units })
+    result.value = { ...response, units }
+  } finally {
+    testing.value = false
+  }
 }
 
 const testTemp = ({ temperature, units }) =>

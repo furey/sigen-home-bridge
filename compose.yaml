@@ -14,17 +14,27 @@ services:
     restart: unless-stopped
     network_mode: host
     env_file: .env
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     volumes:
       - sigen-data:/data
     <<: *logging
 
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared:2026.10.7
     container_name: sigen-cloudflared
     restart: unless-stopped
     network_mode: host
     profiles: [tunnel]
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     depends_on:
       - sigen-home-bridge
     <<: *logging

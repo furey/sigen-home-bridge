@@ -2,7 +2,13 @@
 
 ## Reporting
 
-Open a private security advisory at <https://github.com/furey/sigen-home-bridge/security/advisories/new>.
+Open a private security advisory at <https://github.com/furey/sigen-home-bridge/security/advisories/new>, or use the "Report a vulnerability" button on the repository's Security tab.
+
+You get an acknowledgement within 7 days. Please keep the details private until a fix is available.
+
+## Supported versions
+
+The project is pre-1.0. Only the latest `main` receives security fixes; rebuild your image from it to pick them up.
 
 ## Scope
 

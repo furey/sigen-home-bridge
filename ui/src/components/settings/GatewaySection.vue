@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import {
   Cable, CircleAlert, CircleCheck, Clock, LoaderCircle, Plus, Radar, X
 } from '@lucide/vue'
@@ -10,7 +10,7 @@ import InfoTip from '../InfoTip.vue'
 import SaveBar from './SaveBar.vue'
 import UnsavedDialog from './UnsavedDialog.vue'
 
-const { data, loadOnce, testGateway } = useSettings()
+const { data, loadOnce } = useSettings()
 
 const host = ref('')
 const sigenPort = ref(502)
@@ -18,9 +18,8 @@ const unitId = ref(247)
 const defaultInterval = ref(5)
 const schedule = ref([])
 
-const testing = ref(false)
 const testResult = ref(null)
-const { scanning, scanCandidates, scanError, scan, applyCandidate } =
+const { scanning, scanCandidates, scanError, scan, applyCandidate, testing, test, cancelTest } =
   useGatewayScan({ host, port: sigenPort, unitId, testResult })
 
 const { status, error, dirty, save, markPristine, pendingLeave, confirmLeave, cancelLeave } =
@@ -36,16 +35,10 @@ onMounted(async () => {
   markPristine()
 })
 
-const test = async () => {
-  testing.value = true
+watch([host, sigenPort, unitId], () => {
+  cancelTest()
   testResult.value = null
-  testResult.value = await testGateway({
-    host: host.value.trim(),
-    port: Number(sigenPort.value),
-    unitId: Number(unitId.value)
-  })
-  testing.value = false
-}
+})
 
 const addWindow = () => schedule.value.push({ start: '23:00', end: '08:00', intervalMs: 60000 })
 const removeWindow = (index) => schedule.value.splice(index, 1)

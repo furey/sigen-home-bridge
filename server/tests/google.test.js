@@ -1,11 +1,16 @@
 import { fileURLToPath } from 'node:url'
 import { rmSync } from 'node:fs'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 process.env.DATA_DIR = fileURLToPath(new URL('../../tmp/test-data-google', import.meta.url))
 
 const { handleIntent } = await import('../google.js')
 const { updateSettings, resetSettings } = await import('../settings.js')
+const { state } = await import('../state.js')
+
+beforeEach(() => {
+  state.connected = true
+})
 
 afterEach(() => {
   rmSync(process.env.DATA_DIR, { recursive: true, force: true })
@@ -73,6 +78,15 @@ describe('handleIntent', () => {
     }))
     expect(response.payload.commands[0].status).toBe('SUCCESS')
     expect(response.payload.commands[0].ids).toEqual(['pvPower'])
+  })
+
+  it('QUERY and EXECUTE report devices offline while the gateway is disconnected', () => {
+    state.connected = false
+    expect(Object.values(states()).every((entry) => entry.online === false)).toBe(true)
+    const response = handleIntent(intent('action.devices.EXECUTE', {
+      commands: [{ devices: [{ id: 'pvPower' }], execution: [] }]
+    }))
+    expect(response.payload.commands[0].states.online).toBe(false)
   })
 
   it('rejects unknown intents', () => {

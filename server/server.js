@@ -1,10 +1,11 @@
 import express from 'express'
+import { once } from 'node:events'
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 import { state, subscribe } from './state.js'
 import { buildSnapshot } from './snapshot.js'
 import {
-  getHistory, getHistoryAll, historyStats, nearestSample, downsampleHistory, historyToCsv
+  getHistory, getHistoryAll, historyStats, nearestSample, downsampleHistory, historyExportChunks
 } from './history.js'
 import { getSettings, publicSettings, resetSettings, updateSettings } from './settings.js'
 import { testGateway } from './modbus.js'
@@ -28,19 +29,21 @@ export const startHttpServer = () => {
   return createApp().listen(port, () => console.log(`[http] listening on ${port}`))
 }
 
-export const createApp = () => {
+export const createApp = ({ maxEventClients = MAX_EVENT_CLIENTS, stallMs = MAX_STALL_MS } = {}) => {
   const app = express()
+  app.disable('x-powered-by')
+  app.use(setSecurityHeaders)
   app.use(['/api', '/events'], requireAllowedHost)
   app.use('/api', requireSameSiteJson)
   app.use(express.json())
-  app.get('/events', streamEvents)
+  app.get('/events', eventStream({ maxEventClients, stallMs }))
   app.get('/api/state', (request, response) => response.json(state))
   app.get('/api/snapshot', (request, response) => sendJson(request, response, buildSnapshot()))
   app.get('/api/history', (request, response) => sendJson(request, response, getHistory(historyQuery(request.query))))
   app.get('/api/history/stats', (request, response) => response.json(historyStats()))
   app.get('/api/history/nearest', (request, response) =>
     response.json(nearestSample(nearestQuery(request.query))))
-  app.get('/api/history/export', exportHistory)
+  app.get('/api/history/export', (request, response) => exportHistory(request, response, stallMs))
   app.get('/api/settings', (request, response) =>
     response.json(publicSettings({ authenticated: isAuthenticated(request) })))
   app.put('/api/settings', requirePasscode, saveSettings)
@@ -61,7 +64,14 @@ export const createApp = () => {
   app.post('/token', express.urlencoded({ extended: false }), exchangeToken)
   app.use(express.static(uiDist, { setHeaders: setStaticCacheHeaders }))
   app.use(spaFallback)
+  app.use(sendJsonNotFound)
+  app.use(sendJsonError)
   return app
+}
+
+const setSecurityHeaders = (request, response, next) => {
+  for (const [name, value] of SECURITY_HEADERS) response.setHeader(name, value)
+  next()
 }
 
 const sendJson = (request, response, payload) =>
@@ -95,29 +105,71 @@ const setStaticCacheHeaders = (response, filePath) => {
   if (filePath.includes('/assets/')) response.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
 }
 
-const streamEvents = (request, response) => {
-  response.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    Connection: 'keep-alive',
-    'X-Accel-Buffering': 'no'
-  })
-  const send = (payload) => response.write(`data: ${JSON.stringify(payload)}\n\n`)
-  send(state)
-  const heartbeat = setInterval(() => response.write('event: ping\ndata: {}\n\n'), HEARTBEAT_MS)
-  const unsubscribe = subscribe(send)
-  request.on('close', () => {
-    clearInterval(heartbeat)
-    unsubscribe()
-  })
+const eventStream = ({ maxEventClients, stallMs }) => {
+  const clients = new Set()
+  return (request, response) => {
+    if (clients.size >= maxEventClients) {
+      return response.status(503).json({ error: 'Too many live connections; close another tab and retry' })
+    }
+    clients.add(response)
+    response.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no'
+    })
+    const stream = backpressuredStream(response, stallMs)
+    stream.send(state)
+    const heartbeat = setInterval(stream.ping, HEARTBEAT_MS)
+    const unsubscribe = subscribe(stream.send)
+    response.on('close', () => {
+      clients.delete(response)
+      clearInterval(heartbeat)
+      stream.stop()
+      unsubscribe()
+    })
+  }
 }
 
-const saveSettings = (request, response) => {
+const backpressuredStream = (response, stallMs) => {
+  let blocked = false
+  let stale = false
+  let stallTimer = null
+  const write = (chunk) => {
+    blocked = !response.write(chunk)
+    if (blocked) stallTimer ??= setTimeout(() => response.destroy(), stallMs)
+  }
+  const stop = () => {
+    clearTimeout(stallTimer)
+    stallTimer = null
+  }
+  const send = (payload) => {
+    if (blocked) {
+      stale = true
+      return
+    }
+    write(`data: ${JSON.stringify(payload)}\n\n`)
+  }
+  const ping = () => {
+    if (!blocked) write('event: ping\ndata: {}\n\n')
+  }
+  response.on('drain', () => {
+    stop()
+    blocked = false
+    if (!stale) return
+    stale = false
+    send(state)
+  })
+  return { send, ping, stop }
+}
+
+const saveSettings = (request, response, next) => {
   try {
     updateSettings(request.body)
     response.json(publicSettings({ authenticated: true }))
   } catch (error) {
-    response.status(error.status ?? 400).json({ error: error.message })
+    if (!error.status) return next(error)
+    response.status(error.status).json({ error: error.message })
   }
 }
 
@@ -134,16 +186,33 @@ const discoverGatewayHandler = async (request, response) => {
   response.json(await discoverGateways({ port: Number(port), unitId: Number(unitId) }))
 }
 
-const exportHistory = (request, response) => {
-  const rows = downsampleHistory(getHistoryAll(), exportIntervalMs(request.query.every))
+const exportHistory = async (request, response, stallMs) => {
+  const rows = downsampleHistory(getHistoryAll().slice(), exportIntervalMs(request.query.every))
   const stamp = new Date().toISOString().slice(0, 10)
-  if (request.query.format === 'json') {
-    response.setHeader('Content-Disposition', `attachment; filename="sigen-history-${stamp}.json"`)
-    return response.json(rows)
+  const format = request.query.format === 'json' ? 'json' : 'csv'
+  response.setHeader('Content-Type', EXPORT_CONTENT_TYPES[format])
+  response.setHeader('Content-Disposition', `attachment; filename="sigen-history-${stamp}.${format}"`)
+  await streamChunks({ response, chunks: historyExportChunks({ rows, format }), stallMs })
+}
+
+const streamChunks = async ({ response, chunks, stallMs }) => {
+  for (const chunk of chunks) {
+    if (response.destroyed) return
+    if (!response.write(chunk)) await drainedOrClosed(response, stallMs)
+    await new Promise((resolve) => setImmediate(resolve))
   }
-  response.setHeader('Content-Type', 'text/csv; charset=utf-8')
-  response.setHeader('Content-Disposition', `attachment; filename="sigen-history-${stamp}.csv"`)
-  return response.send(historyToCsv(rows))
+  if (!response.destroyed) response.end()
+}
+
+const drainedOrClosed = async (response, stallMs) => {
+  const abort = new AbortController()
+  const stallTimer = setTimeout(() => response.destroy(), stallMs)
+  await Promise.race([
+    once(response, 'drain', { signal: abort.signal }),
+    once(response, 'close', { signal: abort.signal })
+  ]).catch(() => {})
+  clearTimeout(stallTimer)
+  abort.abort()
 }
 
 const exportIntervalMs = (every) => {
@@ -163,9 +232,41 @@ const testAlertHandler = async (request, response) => {
 }
 
 const spaFallback = (request, response, next) => {
-  if (request.method !== 'GET') return next()
+  if (request.method !== 'GET' || isApiPath(request.path)) return next()
   response.setHeader('Cache-Control', 'no-store')
   response.sendFile(resolve(uiDist, 'index.html'))
 }
+
+const isApiPath = (path) => path === '/api' || path.startsWith('/api/')
+
+const sendJsonNotFound = (request, response) => response.status(404).json({ error: 'Not found' })
+
+const sendJsonError = (error, request, response, next) => {
+  const status = clientErrorStatus(error)
+  if (!status) console.error(`[http] ${request.method} ${request.originalUrl} failed: ${error.stack ?? error}`)
+  if (response.headersSent) return response.destroy()
+  response.status(status ?? 500).json({ error: status ? error.message : 'Internal server error' })
+}
+
+const clientErrorStatus = (error) => {
+  const status = error?.status ?? error?.statusCode
+  return Number.isInteger(status) && status >= 400 && status < 500 ? status : null
+}
+
+const SECURITY_HEADERS = [
+  ['X-Content-Type-Options', 'nosniff'],
+  ['Referrer-Policy', 'same-origin'],
+  ['X-Frame-Options', 'DENY'],
+  ['Content-Security-Policy', "frame-ancestors 'none'"]
+]
+
+const EXPORT_CONTENT_TYPES = {
+  csv: 'text/csv; charset=utf-8',
+  json: 'application/json; charset=utf-8'
+}
+
+const MAX_EVENT_CLIENTS = 50
+
+const MAX_STALL_MS = 45000
 
 const HEARTBEAT_MS = 15000

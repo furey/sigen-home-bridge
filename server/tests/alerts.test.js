@@ -106,7 +106,7 @@ describe('trigger conditions', () => {
   })
 
   it('ignores battery thresholds while the gateway is disconnected', () => {
-    expect(isBad('batteryBelow', { connected: false, batterySoc: 5 }, { threshold: 15 })).toBe(false)
+    expect(isBad('batteryBelow', { connected: false, batterySoc: 5 }, { threshold: 15 })).toBeNull()
   })
 
   it('treats the gateway as bad when disconnected or stale', () => {

@@ -133,6 +133,19 @@ export const useSettings = () => {
 
   const testAlert = (webhook) => withMinDuration(postJson('/api/test/alert', webhook))
 
+  const fetchPairing = async () => {
+    try {
+      const response = await fetch('/api/homekit/pairing', { headers: authHeaders() })
+      const body = await response.json().catch(() => ({}))
+      if (response.status === 401) expireSession()
+      if (body.error) return { ...EMPTY_PAIRING, error: body.error }
+      if (!response.ok) return { ...EMPTY_PAIRING, error: `Pairing details failed to load (HTTP ${response.status})` }
+      return body
+    } catch {
+      return { ...EMPTY_PAIRING, error: 'Could not reach the bridge for pairing details' }
+    }
+  }
+
   const shouldRunSetup = async () => {
     await loadOnce()
     return !data.setupComplete && !dismissed()
@@ -140,7 +153,7 @@ export const useSettings = () => {
 
   return {
     data, status, error, load, loadOnce, save, applyPatch, reset,
-    testGateway, discoverGateway, testWeather, testAlert, shouldRunSetup, dismiss, undismiss,
+    testGateway, discoverGateway, testWeather, testAlert, fetchPairing, shouldRunSetup, dismiss, undismiss,
     unlock, verifySession, commitSession, lock, setPasscode, clearPasscode
   }
 }
@@ -183,12 +196,21 @@ const announceHostRefusal = (message) => {
   window.alert(message)
 }
 
-const postJson = async (url, body) =>
-  (await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify(body)
-  })).json()
+const postJson = async (url, body) => {
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(body)
+    })
+    const reply = await response.json().catch(() => null)
+    if (response.status === 401) expireSession()
+    if (response.ok && reply) return reply
+    return { ok: false, error: reply?.error ?? `Request failed (HTTP ${response.status})` }
+  } catch {
+    return { ok: false, error: 'Could not reach the bridge' }
+  }
+}
 
 const putSettings = async (patch) => {
   const response = await fetch('/api/settings', {
@@ -198,13 +220,17 @@ const putSettings = async (patch) => {
   })
   const body = await response.json()
   if (response.status === 401) {
-    const session = useSession()
-    session.expiredMidEdit.value = true
-    session.clearToken()
+    expireSession()
     throw Object.assign(new Error(body.error ?? 'Settings are locked'), { locked: true })
   }
   if (!response.ok) throw new Error(body.error ?? 'Save failed')
   return body
+}
+
+const expireSession = () => {
+  const session = useSession()
+  session.expiredMidEdit.value = true
+  session.clearToken()
 }
 
 const passcodeRequest = async (url, { method, passcode }) => {
@@ -225,6 +251,8 @@ const passcodeRequest = async (url, { method, passcode }) => {
 const authHeaders = () => useSession().authHeaders()
 
 const DISMISS_KEY = 'sigenSetupDismissed'
+
+const EMPTY_PAIRING = { uri: '', pin: '', qr: '' }
 
 const data = reactive({
   setupComplete: false,

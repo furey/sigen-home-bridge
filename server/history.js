@@ -60,6 +60,15 @@ export const downsampleHistory = (rows, everyMs) => {
 export const historyToCsv = (rows) =>
   `${[CSV_HEADER, ...rows.map(toCsvRow)].map((cells) => cells.join(',')).join('\n')}\n`
 
+export const historyExportChunks = function* ({ rows, format, sliceSize = EXPORT_SLICE_ROWS }) {
+  const encoder = EXPORT_ENCODERS[format] ?? EXPORT_ENCODERS.csv
+  yield encoder.head
+  for (let start = 0; start < rows.length; start += sliceSize) {
+    yield encoder.slice(rows.slice(start, start + sliceSize), start === 0)
+  }
+  if (encoder.tail) yield encoder.tail
+}
+
 export const legacyImportRows = (parsed) =>
   Array.isArray(parsed) ? parsed.filter((row) => Number.isFinite(row?.t)) : []
 
@@ -74,6 +83,17 @@ const CSV_HEADER = ['time', ...FIELDS]
 const toCsvRow = (row) => [new Date(row.t).toISOString(), ...FIELDS.map((field) => csvCell(row[field]))]
 
 const csvCell = (value) => (value === null || value === undefined ? '' : value)
+
+const csvLines = (slice) => slice.map((row) => `${toCsvRow(row).join(',')}\n`).join('')
+
+const jsonItems = (slice, first) => `${first ? '' : ','}${slice.map((row) => JSON.stringify(row)).join(',')}`
+
+const EXPORT_ENCODERS = {
+  csv: { head: `${CSV_HEADER.join(',')}\n`, slice: csvLines, tail: '' },
+  json: { head: '[', slice: jsonItems, tail: ']' }
+}
+
+const EXPORT_SLICE_ROWS = 2000
 
 const clampLimit = (limit) => {
   const count = Math.floor(Number(limit))

@@ -14,5 +14,6 @@ tmp
 .idea
 Dockerfile
 compose.yaml
+server/tests
 *.md
 !README.md

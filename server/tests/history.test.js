@@ -8,7 +8,7 @@ process.env.DATA_DIR = dataDir
 process.env.HISTORY_RETENTION_DAYS = '7'
 
 const {
-  getHistory, getHistoryAll, recordSample, downsampleHistory, historyToCsv, historyStats,
+  getHistory, getHistoryAll, recordSample, downsampleHistory, historyToCsv, historyStats, historyExportChunks,
   nearestSample, legacyImportRows, MAX_SAMPLES, LIVE_LIMIT
 } = await import('../history.js')
 
@@ -247,5 +247,31 @@ describe('history nearest sample', () => {
     expect(nearestSample({ before: at(0) })).toBeNull()
     expect(nearestSample({ after: at(3660) })).toBeNull()
     expect(nearestSample({})).toBeNull()
+  })
+})
+
+describe('history export chunks', () => {
+  const rows = Array.from({ length: 7 }, (_, index) => ({
+    t: Date.parse('2026-06-11T10:00:00.000Z') + index * 5000,
+    pvPower: index, gridPower: null, batteryPower: -index, batterySoc: 50.5,
+    loadPower: 1000, smartPortPower: index % 2 ? null : 7, outdoorTemp: null
+  }))
+  const joined = (format, slice) =>
+    [...historyExportChunks({ rows: slice, format, sliceSize: 3 })].join('')
+
+  it('splits rows into several slices', () => {
+    expect([...historyExportChunks({ rows, format: 'csv', sliceSize: 3 })]).toHaveLength(4)
+  })
+
+  it('matches the buffered CSV for full, partial, and empty exports', () => {
+    for (const slice of [rows, rows.slice(0, 3), rows.slice(0, 1), []]) {
+      expect(joined('csv', slice)).toBe(historyToCsv(slice))
+    }
+  })
+
+  it('matches the buffered JSON for full, partial, and empty exports', () => {
+    for (const slice of [rows, rows.slice(0, 3), rows.slice(0, 1), []]) {
+      expect(joined('json', slice)).toBe(JSON.stringify(slice))
+    }
   })
 })

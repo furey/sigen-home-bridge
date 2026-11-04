@@ -7,21 +7,23 @@ import { discoverInverters, readInverter, readSmartLoads } from './devices.js'
 
 export const startModbusPoller = () => {
   onSettingsChange((changed) => {
-    if (changed.includes('sigen')) reconnect()
+    if (changed.includes('sigen') && (targetChanged() || !state.connected)) reconnect()
   })
   connect()
 }
 
 export const testGateway = ({ host, port, unitId }) => {
   const probe = new ModbusRTU()
+  probe.setTimeout(TEST_TIMEOUT_MS)
   const attempt = readSoc(probe, { host, port, unitId })
   attempt.catch(() => {})
-  const timeout = new Promise((resolve) =>
-    setTimeout(() => resolve({ ok: false, error: 'connection timed out' }), TEST_TIMEOUT_MS))
+  let timer
+  const timeout = new Promise((resolve) => {
+    timer = setTimeout(() => resolve({ ok: false, error: 'connection timed out' }), TEST_TIMEOUT_MS)
+  })
   return Promise.race([attempt, timeout]).finally(() => {
-    try {
-      probe.close(() => {})
-    } catch {}
+    clearTimeout(timer)
+    releasePort(probe)
   })
 }
 
@@ -29,7 +31,6 @@ const readSoc = async (probe, { host, port, unitId }) => {
   try {
     await probe.connectTCP(host, { port: Number(port) })
     probe.setID(Number(unitId))
-    probe.setTimeout(TEST_TIMEOUT_MS)
     const register = REGISTERS.batterySoc
     const batterySoc = register.decode(await probe.readInputRegisters(register.address, register.length))
     return { ok: true, batterySoc }
@@ -58,30 +59,40 @@ const client = new ModbusRTU()
 
 const connect = async () => {
   const epoch = ++generation
+  clearTimeout(reconnectTimer)
   unsupportedRegisters.clear()
   transientFailures.clear()
   smartLoadsSupported = true
+  inverters = []
+  discoveryDelayMs = DISCOVERY_RETRY_MIN_MS
+  noInvertersLogged = false
   const { host, port, unitId } = getSettings().sigen
+  target = { host, port, unitId }
+  releasePort(client)
   try {
+    client.setTimeout(SOCKET_TIMEOUT_MS)
     await client.connectTCP(host, { port })
     if (epoch !== generation) return
-    client.setID(unitId)
-    client.setTimeout(SOCKET_TIMEOUT_MS)
     log(`connected to ${host}:${port} unit ${unitId}`)
-    inverters = await discover()
+    await refreshInverters()
     if (epoch !== generation) return
-    client.setID(unitId)
-    client.setTimeout(SOCKET_TIMEOUT_MS)
     poll(epoch)
   } catch (error) {
     if (epoch === generation) handleFailure(error)
   }
 }
 
+const refreshInverters = async () => {
+  inverters = await discover()
+  nextDiscoveryAt = Date.now() + discoveryDelayMs
+  discoveryDelayMs = Math.min(discoveryDelayMs * 2, DISCOVERY_RETRY_MAX_MS)
+  client.setTimeout(SOCKET_TIMEOUT_MS)
+}
+
 const discover = async () => {
   try {
     const found = await discoverInverters(client)
-    if (found.length) log(`discovered ${found.length} inverter(s): ${found.map((device) => device.model).join(', ')}`)
+    reportDiscovery(found)
     return found
   } catch (error) {
     log(`device discovery failed: ${error.message}`)
@@ -89,8 +100,23 @@ const discover = async () => {
   }
 }
 
+const reportDiscovery = (found) => {
+  if (found.length) {
+    noInvertersLogged = false
+    log(`discovered ${found.length} inverter(s): ${found.map((device) => device.model).join(', ')}`)
+    return
+  }
+  if (noInvertersLogged) return
+  noInvertersLogged = true
+  log('no inverters found; retrying discovery in the background')
+}
+
+const discoveryDue = () => !inverters.length && Date.now() >= nextDiscoveryAt
+
 const poll = async (epoch) => {
   try {
+    if (discoveryDue()) await refreshInverters()
+    if (epoch !== generation) return
     client.setID(getSettings().sigen.unitId)
     const readings = {}
     for (const [key, register] of Object.entries(REGISTERS)) {
@@ -202,27 +228,37 @@ const scheduleNext = (epoch, interval) => {
   return interval
 }
 
+const targetChanged = () => {
+  const { host, port, unitId } = getSettings().sigen
+  return host !== target?.host || port !== target?.port || unitId !== target?.unitId
+}
+
 const reconnect = () => {
   generation++
   clearTimeout(pollTimer)
-  closeQuietly()
+  releasePort(client)
   log('settings changed; reconnecting to gateway')
-  setTimeout(connect, RECONNECT_DEBOUNCE_MS)
+  scheduleConnect(RECONNECT_DEBOUNCE_MS)
 }
 
 const handleFailure = (error) => {
   state.connected = false
   publish()
   clearTimeout(pollTimer)
-  closeQuietly()
+  releasePort(client)
   const delay = getSettings().poll.reconnectDelayMs
   log(`error: ${error.message}; reconnecting in ${delay}ms`)
-  setTimeout(connect, delay)
+  scheduleConnect(delay)
 }
 
-const closeQuietly = () => {
+const scheduleConnect = (delay) => {
+  clearTimeout(reconnectTimer)
+  reconnectTimer = setTimeout(connect, delay)
+}
+
+const releasePort = (modbus) => {
   try {
-    client.close(() => {})
+    modbus.destroy(() => {})
   } catch {}
 }
 
@@ -246,6 +282,16 @@ const log = (message) => console.log(`[modbus] ${message}`)
 
 let pollTimer = null
 
+let reconnectTimer = null
+
+let target = null
+
+let nextDiscoveryAt = 0
+
+let discoveryDelayMs = 0
+
+let noInvertersLogged = false
+
 let generation = 0
 
 let inverters = []
@@ -261,6 +307,10 @@ const SOCKET_TIMEOUT_MS = 5000
 const TEST_TIMEOUT_MS = 3000
 
 const RECONNECT_DEBOUNCE_MS = 250
+
+const DISCOVERY_RETRY_MIN_MS = 60_000
+
+const DISCOVERY_RETRY_MAX_MS = 15 * 60_000
 
 const UNSUPPORTED_EXCEPTION_CODES = new Set([1, 2])
 

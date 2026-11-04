@@ -21,7 +21,7 @@ const main = () => {
 }
 
 const announce = () => {
-  console.log(`[sigen-home-bridge] gateway ${config.sigen.host}:${config.sigen.port}`)
+  console.log(`[sigen-home-bridge] gateway ${getSettings().sigen.host}:${getSettings().sigen.port}`)
   console.log(`[sigen-home-bridge] dashboard http://localhost:${getSettings().server.port}`)
   console.log(`[sigen-home-bridge] data ${config.paths.data}`)
 }

@@ -89,6 +89,7 @@ const buildCatalogue = (temperature) => [
     paramLabel: 'Temperature at or above', unit: '°',
     min: temperature.min, max: temperature.max, default: temperature.hot, hysteresis: 1,
     available: (ctx) => ctx.weatherEnabled,
+    gated: false,
     contactHint: 'Open while it is hot out',
     describe: ({ value }) => `Outdoor temperature is ${Math.round(value)}°`
   }),
@@ -98,6 +99,7 @@ const buildCatalogue = (temperature) => [
     paramLabel: 'Temperature at or below', unit: '°',
     min: temperature.min, max: temperature.max, default: temperature.cold, hysteresis: 1,
     available: (ctx) => ctx.weatherEnabled,
+    gated: false,
     contactHint: 'Open while it is cold out',
     describe: ({ value }) => `Outdoor temperature is ${Math.round(value)}°`
   }),
@@ -116,40 +118,49 @@ const threshold = ({
   min, max, step = 1, default: fallback, hysteresis,
   paramLabel, contactHint, describe,
   available = () => true,
+  gated = true,
   armMs = THRESHOLD_ARM_MS, clearMs = THRESHOLD_CLEAR_MS
-}) => ({
-  type,
-  label,
-  group,
-  contactHint,
-  available,
-  defaultNotify: { raised: true, cleared: false },
-  params: [{ key: 'threshold', label: paramLabel, unit, min, max, step, default: fallback }],
-  isBad: ({ ctx, params, active }) => {
-    const value = signal(ctx)
-    if (value == null) return false
-    const band = active ? hysteresis : 0
-    return comparison === 'below' ? value <= params.threshold + band : value >= params.threshold - band
-  },
-  describe: ({ ctx, params }) => describe({ value: signal(ctx), threshold: params.threshold }),
-  reading: ({ ctx, params }) => ({
-    value: roundReading(signal(ctx)),
-    comparison: comparisonLabel(comparison),
-    threshold: params.threshold,
-    unit
-  }),
-  sample: (params) => ({
-    message: describe({ value: params.threshold, threshold: params.threshold }),
-    condition: {
-      value: params.threshold,
+}) => {
+  const current = (ctx) => gated && !ctx.connected ? null : signal(ctx)
+  return {
+    type,
+    label,
+    group,
+    contactHint,
+    available,
+    defaultNotify: { raised: true, cleared: false },
+    params: [{ key: 'threshold', label: paramLabel, unit, min, max, step, default: fallback }],
+    isBad: ({ ctx, params, active }) => {
+      const value = current(ctx)
+      if (value == null) return gated ? null : false
+      const band = active ? hysteresis : 0
+      return comparison === 'below' ? value <= params.threshold + band : value >= params.threshold - band
+    },
+    describe: ({ ctx, params }) => {
+      const value = current(ctx)
+      return Number.isFinite(value)
+        ? describe({ value, threshold: params.threshold })
+        : `${label}: no current reading`
+    },
+    reading: ({ ctx, params }) => ({
+      value: roundReading(current(ctx)),
       comparison: comparisonLabel(comparison),
       threshold: params.threshold,
       unit
-    }
-  }),
-  armMs: () => armMs,
-  clearMs: () => clearMs
-})
+    }),
+    sample: (params) => ({
+      message: describe({ value: params.threshold, threshold: params.threshold }),
+      condition: {
+        value: params.threshold,
+        comparison: comparisonLabel(comparison),
+        threshold: params.threshold,
+        unit
+      }
+    }),
+    armMs: () => armMs,
+    clearMs: () => clearMs
+  }
+}
 
 const gatewayOffline = {
   type: 'gatewayOffline',
@@ -175,10 +186,12 @@ const gatewayOffline = {
   clearMs: () => OFFLINE_CLEAR_MS
 }
 
-const emptyingMinutes = (ctx) =>
-  ctx.estimate?.status === 'ready' && ctx.estimate.direction === 'discharge'
-    ? ctx.estimate.minutesRemaining
-    : null
+const emptyingMinutes = ({ estimate }) => {
+  if (!estimate || estimate.status === 'warming') return null
+  return estimate.status === 'ready' && estimate.direction === 'discharge'
+    ? estimate.minutesRemaining
+    : Infinity
+}
 
 const formatWatts = (watts) =>
   watts >= 1000 ? `${(watts / 1000).toFixed(1)} kW` : `${Math.round(watts)} W`

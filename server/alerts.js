@@ -22,6 +22,7 @@ export const testAlert = async ({ url, id, name, trigger }) => {
 }
 
 export const stepRule = ({ prev, bad, armMs, clearMs, now }) => {
+  if (bad == null) return { next: { ...prev, candidateAt: null }, edge: null }
   if (bad === prev.active) return { next: { ...prev, candidateAt: null }, edge: null }
   const candidateAt = prev.candidateAt ?? now
   const elapsed = now - candidateAt
@@ -84,7 +85,7 @@ const dispatch = ({ edges, ctx }) => {
   for (const { item, edge, at } of edges) {
     const { webhook } = item.channels
     if (!webhook.enabled || !webhook.url || !item.notify[edge]) continue
-    postWebhook(webhook.url, payloadFor({ item, edge, at, ctx }))
+    deliverWebhook(webhook.url, payloadFor({ item, edge, at, ctx }))
       .catch((error) => log(`webhook failed: ${error.message}`))
   }
 }
@@ -165,8 +166,26 @@ const postWebhook = async (url, payload) => {
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS)
   })
-  if (!response.ok) throw new Error(`webhook responded ${response.status}`)
+  if (!response.ok) throw webhookError(response.status)
 }
+
+const deliverWebhook = async (url, payload) => {
+  try {
+    await postWebhook(url, payload)
+  } catch (error) {
+    if (!isRetryable(error)) throw error
+    log(`webhook failed (${error.message}); retrying in ${WEBHOOK_RETRY_MS / 1000}s`)
+    await sleep(WEBHOOK_RETRY_MS)
+    await postWebhook(url, payload)
+  }
+}
+
+const webhookError = (status) =>
+  Object.assign(new Error(`webhook responded ${status}`), { status })
+
+const isRetryable = (error) => error.status == null || error.status >= 500
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 const log = (message) => console.log(`[alerts] ${message}`)
 
@@ -179,3 +198,5 @@ const IDLE = { active: false, since: null, candidateAt: null }
 const TICK_MS = 15000
 
 const WEBHOOK_TIMEOUT_MS = 5000
+
+const WEBHOOK_RETRY_MS = 5000

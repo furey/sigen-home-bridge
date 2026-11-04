@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
+import { createServer } from 'node:net'
 import qrcode from 'qrcode-terminal'
 import QrCodeSvg from 'qrcode-svg'
 import {
@@ -19,6 +20,7 @@ import { getActiveAlertIds } from './alerts.js'
 import { socPercent } from './derive.js'
 
 export const getPairing = () => {
+  if (publishError) return { uri: '', pin: getSettings().homekit.pin, qr: '', error: publishError }
   if (!pairingUri) return { uri: '', pin: getSettings().homekit.pin, qr: '' }
   pairingQr ??= toQrDataUri(pairingUri)
   return { uri: pairingUri, pin: pairingPin, qr: pairingQr }
@@ -38,19 +40,40 @@ export const startHomeKit = () => {
     .filter((item) => item.channels.homekit.enabled)
     .map((item) =>
       addContact(bridge, { id: item.id, label: item.channels.homekit.sensorName?.trim() || item.name, info }))
-  bridge.publish({
-    username: deriveUsername(pin),
-    pincode: pin,
-    port,
-    category: Categories.BRIDGE,
-    advertiser: MDNSAdvertiser.CIAO,
-    bind: bind ?? config.homekit.bind,
-    addIdentifyingMaterial: false
-  }).catch((error) => console.log(`[homekit] disabled; publish failed: ${error.message}`))
-  announce(bridge, pin)
+  publishBridge({
+    bridge,
+    pin,
+    options: {
+      username: deriveUsername(pin),
+      pincode: pin,
+      port,
+      category: Categories.BRIDGE,
+      advertiser: MDNSAdvertiser.CIAO,
+      bind: bind ?? config.homekit.bind,
+      addIdentifyingMaterial: false
+    }
+  })
   pushValues()
   setInterval(pushValues, PUSH_INTERVAL_MS)
 }
+
+const publishBridge = async ({ bridge, pin, options }) => {
+  try {
+    await ensurePortFree(options.port)
+    bridge.once('advertised', () => announce(bridge, pin))
+    await bridge.publish(options)
+  } catch (error) {
+    publishError = `HomeKit is not running: ${error.message}`
+    console.log(`[homekit] disabled; publish failed: ${error.message}`)
+  }
+}
+
+const ensurePortFree = (port) => new Promise((resolve, reject) => {
+  if (!port) return resolve()
+  const probe = createServer()
+  probe.once('error', reject)
+  probe.listen(port, () => probe.close(() => resolve()))
+})
 
 const addBattery = (bridge, { label, info }) => {
   const accessory = buildAccessory({ name: label, key: 'battery', info })
@@ -64,6 +87,7 @@ const addBattery = (bridge, { label, info }) => {
 const addSensor = (bridge, { key, name, info }) => {
   const accessory = buildAccessory({ name, key, info })
   const service = accessory.addService(Service.TemperatureSensor, name, key)
+  service.addCharacteristic(Characteristic.StatusFault)
   service.getCharacteristic(Characteristic.CurrentTemperature).setProps(POWER_UNIT_PROPS[powerUnit])
   bridge.addBridgedAccessory(accessory)
   return { service, key }
@@ -95,6 +119,7 @@ const pushValues = () => {
   battery.updateCharacteristic(Characteristic.StatusFault, faultValue())
   for (const { service, key } of sensors) {
     service.updateCharacteristic(Characteristic.CurrentTemperature, powerReading(state[key]))
+    service.updateCharacteristic(Characteristic.StatusFault, faultValue())
   }
   syncAlertContacts()
 }
@@ -150,6 +175,7 @@ let alertContacts = []
 let pairingUri = ''
 let pairingPin = ''
 let pairingQr = null
+let publishError = ''
 
 const PUSH_INTERVAL_MS = 2000
 
