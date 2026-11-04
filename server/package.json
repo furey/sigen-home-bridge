@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "dotenv": "17.4.2",
-    "express": "5.2.1",
+    "express": "5.3.0",
     "hap-nodejs": "0.14.3",
     "modbus-serial": "8.0.25",
     "qrcode-svg": "1.1.0",
