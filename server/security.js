@@ -8,17 +8,18 @@ export const requirePasscode = (request, response, next) => {
 }
 
 export const unlock = (request, response) => {
-  const lockedFor = lockoutRemaining()
-  if (lockedFor > 0) return response.status(429).json({ error: 'Too many attempts', retryAfter: lockedFor })
+  const client = clientKey(request)
+  const lockedFor = lockoutRemaining(client)
+  if (lockedFor > 0) return tooManyAttempts(response, lockedFor)
   if (!passcodeSet()) return response.json({ token: openSession() })
   if (!storedPasscodeMatches(request.body?.passcode)) {
-    const remaining = registerFailure()
+    const remaining = registerFailure(client)
     if (remaining === 0) {
-      return response.status(429).json({ error: 'Too many attempts', retryAfter: lockoutRemaining() })
+      return tooManyAttempts(response, lockoutRemaining(client))
     }
     return response.status(401).json({ error: 'Incorrect passcode', remaining })
   }
-  resetLockout()
+  lockouts.delete(client)
   return response.json({ token: openSession() })
 }
 
@@ -34,7 +35,7 @@ export const isAuthenticated = (request) => !passcodeSet() || validToken(bearerT
 
 export const requireGoogleToken = (request, response, next) => {
   const expected = getSettings().google.authToken
-  if (!expected || tokensMatch(bearerToken(request), expected)) return next()
+  if (expected && tokensMatch(bearerToken(request), expected)) return next()
   return response.status(401).json({ error: 'Unauthorized' })
 }
 
@@ -45,14 +46,14 @@ export const setPasscode = (request, response) => {
   }
   updateSecurity({ passcode: hashPasscode(passcode) })
   clearSessions()
-  resetLockout()
+  resetLockouts()
   return response.json({ token: openSession() })
 }
 
 export const clearPasscode = (request, response) => {
   updateSecurity({ passcode: null })
   clearSessions()
-  resetLockout()
+  resetLockouts()
   return response.json({ ok: true })
 }
 
@@ -60,6 +61,12 @@ export const hashPasscode = (passcode, salt = randomBytes(SALT_BYTES).toString('
   salt,
   hash: scryptSync(passcode, salt, KEY_BYTES).toString('hex')
 })
+
+export const tokensMatch = (provided, expected) => {
+  const left = Buffer.from(String(provided))
+  const right = Buffer.from(String(expected))
+  return left.length === right.length && timingSafeEqual(left, right)
+}
 
 export const passcodeMatches = ({ passcode, salt, hash }) => {
   const expected = Buffer.from(hash, 'hex')
@@ -82,13 +89,37 @@ const bearerToken = (request) => {
   return scheme === 'Bearer' && token ? token : ''
 }
 
-const tokensMatch = (provided, expected) => {
-  const left = Buffer.from(String(provided))
-  const right = Buffer.from(String(expected))
-  return left.length === right.length && timingSafeEqual(left, right)
+const tooManyAttempts = (response, retryAfter) =>
+  response.status(429).json({ error: 'Too many attempts', retryAfter })
+
+const clientKey = (request) => fromLocalTunnel(request)
+  ? `${TUNNEL_KEY_PREFIX}${addressKey(String(request.headers['cf-connecting-ip']))}`
+  : addressKey(request.socket?.remoteAddress ?? '')
+
+const fromLocalTunnel = (request) =>
+  isLoopback(request.socket?.remoteAddress) && Boolean(request.headers['cf-connecting-ip'])
+
+const isLoopback = (address = '') =>
+  address === '::1' || address.startsWith('127.') || address.startsWith('::ffff:127.')
+
+const addressKey = (address) => {
+  const mappedIpv4 = address.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i)
+  if (mappedIpv4) return mappedIpv4[1]
+  if (!address.includes(':')) return address
+  return `${ipv6Groups(address).slice(0, 4).join(':')}::/64`
+}
+
+const ipv6Groups = (address) => {
+  const [head, tail] = address.split('%')[0].toLowerCase().split('::')
+  const left = head ? head.split(':') : []
+  const right = tail ? tail.split(':') : []
+  const gap = tail === undefined ? 0 : Math.max(0, 8 - left.length - right.length)
+  return [...left, ...Array(gap).fill('0'), ...right].map((group) => group.replace(/^0+(?=.)/, ''))
 }
 
 const openSession = () => {
+  pruneExpired(sessions, (expiry) => expiry)
+  evictOldest(sessions, MAX_SESSIONS)
   const token = randomBytes(TOKEN_BYTES).toString('hex')
   sessions.set(token, Date.now() + SESSION_TTL_MS)
   return token
@@ -108,21 +139,59 @@ const closeSession = (token) => sessions.delete(token)
 
 const clearSessions = () => sessions.clear()
 
-const lockoutRemaining = () => Math.max(0, Math.ceil((lockedUntil - Date.now()) / 1000))
-
-const registerFailure = () => {
-  failures += 1
-  if (failures >= MAX_ATTEMPTS) {
-    lockedUntil = Date.now() + LOCKOUT_MS
-    failures = 0
-    return 0
-  }
-  return MAX_ATTEMPTS - failures
+const lockoutRemaining = (client) => {
+  const lockedUntil = Math.max(lockouts.get(client)?.lockedUntil ?? 0, tunnelLockedUntil(client))
+  return Math.max(0, Math.ceil((lockedUntil - Date.now()) / 1000))
 }
 
-const resetLockout = () => {
-  failures = 0
-  lockedUntil = 0
+const tunnelLockedUntil = (client) => {
+  if (!isTunnelKey(client)) return 0
+  const windowStart = Date.now() - FAILURE_WINDOW_MS
+  while (failureLog.length > 0 && failureLog[0] <= windowStart) failureLog.shift()
+  return failureLog.length < MAX_FAILURES_PER_WINDOW ? 0 : failureLog[0] + FAILURE_WINDOW_MS
+}
+
+const isTunnelKey = (client) => client.startsWith(TUNNEL_KEY_PREFIX)
+
+const logFailure = (client, now) => {
+  if (!isTunnelKey(client)) return
+  failureLog.push(now)
+  if (failureLog.length > MAX_FAILURES_PER_WINDOW) failureLog.shift()
+}
+
+const resetLockouts = () => {
+  lockouts.clear()
+  failureLog.splice(0)
+}
+
+const registerFailure = (client) => {
+  const now = Date.now()
+  logFailure(client, now)
+  const entry = lockouts.get(client) ?? { failures: 0, strikes: 0, lockedUntil: 0 }
+  lockouts.delete(client)
+  pruneExpired(lockouts, ({ forgetAt }) => forgetAt)
+  evictOldest(lockouts, MAX_CLIENTS)
+  const failures = entry.failures + 1
+  const lockedOut = failures >= MAX_ATTEMPTS
+  const strikes = lockedOut ? entry.strikes + 1 : entry.strikes
+  const lockedUntil = lockedOut ? now + lockoutDuration(strikes) : entry.lockedUntil
+  const forgetAt = Math.max(now, lockedUntil) + MAX_LOCKOUT_MS
+  lockouts.set(client, { failures: lockedOut ? 0 : failures, strikes, lockedUntil, forgetAt })
+  return lockedOut || tunnelLockedUntil(client) > now ? 0 : MAX_ATTEMPTS - failures
+}
+
+const lockoutDuration = (strikes) => Math.min(LOCKOUT_MS * 2 ** (strikes - 1), MAX_LOCKOUT_MS)
+
+const pruneExpired = (map, expiryOf) => {
+  const now = Date.now()
+  for (const [key, value] of map) if (expiryOf(value) <= now) map.delete(key)
+}
+
+const evictOldest = (map, cap) => {
+  for (const key of map.keys()) {
+    if (map.size < cap) return
+    map.delete(key)
+  }
 }
 
 const PIN_LENGTH = 4
@@ -139,8 +208,20 @@ const MAX_ATTEMPTS = 5
 
 const LOCKOUT_MS = 60 * 1000
 
+const MAX_LOCKOUT_MS = 60 * 60 * 1000
+
+const MAX_CLIENTS = 1000
+
+const MAX_SESSIONS = 100
+
+const MAX_FAILURES_PER_WINDOW = 50
+
+const FAILURE_WINDOW_MS = 60 * 60 * 1000
+
+const TUNNEL_KEY_PREFIX = 'cf:'
+
 const sessions = new Map()
 
-let failures = 0
+const lockouts = new Map()
 
-let lockedUntil = 0
+const failureLog = []

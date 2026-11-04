@@ -34,7 +34,8 @@ export const getHistoryAll = () => samples
 export const historyStats = () => ({
   count: samples.length,
   firstT: samples.length ? samples[0].t : null,
-  lastT: samples.length ? samples.at(-1).t : null
+  lastT: samples.length ? samples.at(-1).t : null,
+  maxSamples: MAX_SAMPLES
 })
 
 export const nearestSample = ({ before = null, after = null } = {}) => {

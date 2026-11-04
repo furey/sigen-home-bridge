@@ -101,9 +101,9 @@ function buildPatch() {
         In the Google Home Developer Console, create a cloud-to-cloud project. Set the fulfillment URL to
         <span class="text-zinc-200">https://&lt;your-tunnel-host&gt;/fulfillment</span> and the OAuth Authorization
         and Token URLs to <span class="text-zinc-200">/auth</span> and <span class="text-zinc-200">/token</span> on
-        the same host. Client ID and secret can be any non-empty values.
+        the same host. Client ID can be any non-empty value; Client secret must match the Auth token above.
       </li>
-      <li>Set the Auth token above to any value. It's the shared bearer the stub OAuth hands back; treat it as a secret.</li>
+      <li>Set the Auth token above to a long random value (the default is public). Google sends it as the bearer and the OAuth client secret, so treat it as a secret.</li>
       <li>
         Link the project in the Google Home app. The battery appears as a battery tile; solar, grid, home, and
         battery power appear as temperature tiles reading watts.

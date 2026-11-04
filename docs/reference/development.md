@@ -27,6 +27,8 @@ sigen-home-bridge/
 │   ├── schedule.js     resolves the poll interval from time windows
 │   ├── settings.js     persisted, live-editable config (all sections) + listeners
 │   ├── security.js     optional settings passcode: scrypt hash, session tokens, lockout
+│   ├── oauth.js        Google account-linking OAuth: /auth one-time codes, /token checks
+│   ├── hosts.js        Host allow-list and same-origin JSON check for /api and /events
 │   ├── weather.js      outdoor temperature from Open-Meteo
 │   ├── state.js        shared in-memory state and pub/sub
 │   ├── history.js      reading history in SQLite (write-through), retention + CSV/JSON export
@@ -36,7 +38,7 @@ sigen-home-bridge/
 │   ├── alerts.js       alert engine: evaluates the alert list, debounce, dispatch
 │   ├── homekit.js      HAP bridge and accessories
 │   ├── google.js       Google Smart Home intent handlers
-│   ├── server.js       Express app: SSE, REST, static UI, stub OAuth, passcode gate
+│   ├── server.js       Express app: SSE, REST, static UI, route wiring, passcode gate
 │   ├── probe.js        one-shot Modbus read for verification
 │   └── tests/          Vitest unit tests
 ├── ui/                 Vue 3 + Vite + Tailwind dashboard
@@ -70,7 +72,7 @@ Run from the repository root.
 | `npm run probe`       | Read the gateway once and print decoded values                     |
 | `npm run screenshots` | Recapture the README screenshots (Docker + Playwright)             |
 | `npm run walkthrough` | Record the README walkthrough video (Docker + Playwright + ffmpeg) |
-| `npm run og`          | Regenerate the docs social preview card (Docker + Playwright)       |
+| `npm run og`          | Regenerate the docs social preview card (Docker + Playwright)      |
 
 ## Verifying the gateway {#verifying-the-gateway}
 

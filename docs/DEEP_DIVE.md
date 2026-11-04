@@ -108,7 +108,7 @@ The weather poller is similarly failure-tolerant: a failed fetch gets one immedi
 
 ## Settings precedence
 
-Every value in `.env` is a seed for first boot. Once you save in the UI it's written to `/data/settings.json`, which takes precedence (`TZ`, `CLOUDFLARE_TUNNEL_TOKEN`, and `DATA_DIR` are the exceptions; they're read from the environment at process start). Most changes apply immediately: editing the gateway reconnects the Modbus socket, weather reloads its fetch loop, and poll edits take effect on the next cycle. The HomeKit fields and the HTTP server port can't change on a running process, so they're marked "requires restart" and apply on the next start. The Google token is write-only: it's never sent back to the browser (shown as `••••• (stored)`), so leave it blank to keep the current value. The optional Settings passcode is similar: it lands in the `security` section as a salted scrypt hash, the API reports only whether one is set, and once set every settings change must carry a session token from `POST /api/unlock`. Reset wipes `settings.json` back to the env seeds and re-runs the wizard.
+Every value in `.env` is a seed for first boot. Once you save in the UI it's written to `/data/settings.json`, which takes precedence (`TZ`, `CLOUDFLARE_TUNNEL_TOKEN`, and `DATA_DIR` are the exceptions; they're read from the environment at process start). Most changes apply immediately: editing the gateway reconnects the Modbus socket, weather reloads its fetch loop, and poll edits take effect on the next cycle. The HomeKit fields and the HTTP server port can't change on a running process, so they're marked "requires restart" and apply on the next start. The Google token is write-only: it's never sent back to the browser (shown as `••••• (stored)`), so leave it blank to keep the current value. The optional Settings passcode is similar: it lands in the `security` section as a salted scrypt hash, the API reports only whether one is set, and once set every settings change must carry a session token from `POST /api/unlock`. Reset returns every setting except history retention to the env seeds, clears the passcode, and re-runs the wizard; stored history and HomeKit pairing are kept.
 
 ```mermaid
 flowchart LR
@@ -128,29 +128,30 @@ For polling, set a default interval, then add overrides: time windows that poll 
 
 Copy `.env.example` to `.env`. Every value has a default. These are seeds for the first boot; once you save in the wizard or settings they're written to `/data/settings.json`, which takes precedence.
 
-| Variable                  | Default                    | Purpose                                                                 |
-| ------------------------- | -------------------------- | ----------------------------------------------------------------------- |
-| `SIGEN_IP`                | _(empty)_                  | Gateway address; set it or use the setup wizard                         |
-| `SIGEN_PORT`              | `502`                      | Modbus TCP port                                                         |
-| `SIGEN_UNIT_ID`           | `247`                      | Plant (aggregate) unit ID                                               |
-| `POLL_INTERVAL_MS`        | `5000`                     | Fallback interval when no schedule window matches                       |
-| `RECONNECT_DELAY_MS`      | `10000`                    | Delay between reconnect attempts                                        |
-| `POLL_SCHEDULE`           | _(empty)_                  | Seed for the schedule editor, e.g. `08:00-12:00@5000,17:00-21:00@10000` |
-| `TZ`                      | `UTC`                      | Local time zone for schedule windows                                    |
-| `SERVER_PORT`             | `5163`                     | Dashboard and fulfillment port                                          |
-| `WEATHER_ENABLED`         | `true`                     | Set `false` to hide the header temperature and skip all weather calls   |
-| `LATITUDE`                | _(auto via IP)_            | Pin exact latitude; unset means a one-off IP-based geolocation          |
-| `LONGITUDE`               | _(auto via IP)_            | Pin exact longitude; unset means a one-off IP-based geolocation         |
-| `WEATHER_UNITS`           | `celsius`                  | `celsius` or `fahrenheit`                                               |
-| `WEATHER_REFRESH_MS`      | `600000`                   | How often to refresh the outdoor temperature                            |
-| `HISTORY_RETENTION_DAYS`  | `7`                        | Days of trend history to keep (1–90); editable under Settings → History |
-| `HOMEKIT_NAME`            | `Sigenergy`                | HomeKit bridge name                                                     |
-| `HOMEKIT_PIN`             | `516-35-163`               | HomeKit pairing PIN                                                     |
-| `HOMEKIT_PORT`            | `51826`                    | HAP server port                                                         |
-| `HOMEKIT_BIND`            | _(all interfaces)_         | Limit the HomeKit advertisement to one interface/IP (e.g. `eth0`)       |
-| `GOOGLE_AUTH_TOKEN`       | `sigen-home-bridge-token`  | Static bearer for the stub OAuth                                        |
-| `CLOUDFLARE_TUNNEL_TOKEN` | _(empty)_                  | Token for the `cloudflared` sidecar                                     |
-| `DATA_DIR`                | `./data` (Docker: `/data`) | Pairing state and saved settings                                        |
+| Variable                  | Default                      | Purpose                                                                                                                                                             |
+| ------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SIGEN_IP`                | _(empty)_                    | Gateway address; set it or use the setup wizard                                                                                                                     |
+| `SIGEN_PORT`              | `502`                        | Modbus TCP port                                                                                                                                                     |
+| `SIGEN_UNIT_ID`           | `247`                        | Plant (aggregate) unit ID                                                                                                                                           |
+| `POLL_INTERVAL_MS`        | `5000`                       | Fallback interval when no schedule window matches                                                                                                                   |
+| `RECONNECT_DELAY_MS`      | `10000`                      | Delay between reconnect attempts                                                                                                                                    |
+| `POLL_SCHEDULE`           | _(empty)_                    | Seed for the schedule editor, e.g. `08:00-12:00@5000,17:00-21:00@10000`                                                                                             |
+| `TZ`                      | `UTC`                        | Local time zone for schedule windows                                                                                                                                |
+| `SERVER_PORT`             | `5163`                       | Dashboard and fulfillment port                                                                                                                                      |
+| `ALLOWED_HOSTS`           | _(empty)_                    | Extra hostnames the dashboard API answers to, comma-separated. Required for a tunnel or custom DNS name, or `/api` returns `403`; IPs and LAN names pass without it |
+| `WEATHER_ENABLED`         | `true`                       | Set `false` to hide the header temperature and skip all weather calls                                                                                               |
+| `LATITUDE`                | _(auto via IP)_              | Pin exact latitude; unset means a one-off IP-based geolocation                                                                                                      |
+| `LONGITUDE`               | _(auto via IP)_              | Pin exact longitude; unset means a one-off IP-based geolocation                                                                                                     |
+| `WEATHER_UNITS`           | `celsius`                    | `celsius` or `fahrenheit`                                                                                                                                           |
+| `WEATHER_REFRESH_MS`      | `600000`                     | How often to refresh the outdoor temperature                                                                                                                        |
+| `HISTORY_RETENTION_DAYS`  | `7`                          | Days of trend history to keep (1–90); editable under Settings → History                                                                                             |
+| `HOMEKIT_NAME`            | `Sigenergy`                  | HomeKit bridge name                                                                                                                                                 |
+| `HOMEKIT_PIN`             | `516-35-163`                 | HomeKit pairing PIN                                                                                                                                                 |
+| `HOMEKIT_PORT`            | `51826`                      | HAP server port                                                                                                                                                     |
+| `HOMEKIT_BIND`            | _(all interfaces)_           | Limit the HomeKit advertisement to one interface/IP (e.g. `eth0`)                                                                                                   |
+| `GOOGLE_AUTH_TOKEN`       | _(random until you set one)_ | Google bearer and OAuth client secret; set a long random value                                                                                                      |
+| `CLOUDFLARE_TUNNEL_TOKEN` | _(empty)_                    | Token for the `cloudflared` sidecar                                                                                                                                 |
+| `DATA_DIR`                | `./data` (Docker: `/data`)   | Pairing state and saved settings                                                                                                                                    |
 
 `POLL_SCHEDULE` is a comma-separated list of `HH:MM-HH:MM@INTERVAL_MS` windows. A window may wrap past midnight (`22:00-06:00`). The first matching window wins; outside all of them the default interval applies. Once you save in the dashboard, `/data/settings.json` overrides this seed.
 
@@ -158,25 +159,25 @@ Copy `.env.example` to `.env`. Every value has a default. These are seeds for th
 
 All values are input registers (function code `0x04`), read at their raw addresses (no `30001` offset). Power registers are signed 32-bit big-endian in watts; SOC and SOH are 16-bit values scaled by ten; energy counters are unsigned big-endian integers scaled by 100 to kWh.
 
-| Signal                     | Register | Words | Type        | Meaning                                       |
-| -------------------------- | -------- | ----- | ----------- | --------------------------------------------- |
-| `gridPower`                | 30005    | 2     | int32 W     | Grid power (positive import, negative export) |
-| `batterySoc`               | 30014    | 1     | uint16 ÷10  | Battery state of charge, percent              |
-| `sigenPvPower`             | 30035    | 2     | int32 W     | Sigenergy DC solar production                 |
-| `ratedEnergyCapacity`      | 30083    | 2     | uint32 ÷100 | Installed battery capacity, kWh               |
-| `batterySoh`               | 30087    | 1     | uint16 ÷10  | Battery state of health, percent              |
-| `lifetimePv`               | 30088    | 4     | uint64 ÷100 | Cumulative PV generation, kWh                 |
-| `consumedToday`            | 30092    | 2     | uint32 ÷100 | Home consumption since midnight, kWh          |
-| `lifetimeConsumed`         | 30094    | 4     | uint64 ÷100 | Cumulative home consumption, kWh              |
+| Signal                     | Register | Words | Type        | Meaning                                                       |
+| -------------------------- | -------- | ----- | ----------- | ------------------------------------------------------------- |
+| `gridPower`                | 30005    | 2     | int32 W     | Grid power (positive import, negative export)                 |
+| `batterySoc`               | 30014    | 1     | uint16 ÷10  | Battery state of charge, percent                              |
+| `sigenPvPower`             | 30035    | 2     | int32 W     | Sigenergy DC solar production                                 |
+| `ratedEnergyCapacity`      | 30083    | 2     | uint32 ÷100 | Installed battery capacity, kWh                               |
+| `batterySoh`               | 30087    | 1     | uint16 ÷10  | Battery state of health, percent                              |
+| `lifetimePv`               | 30088    | 4     | uint64 ÷100 | Cumulative PV generation, kWh                                 |
+| `consumedToday`            | 30092    | 2     | uint32 ÷100 | Home consumption since midnight, kWh                          |
+| `lifetimeConsumed`         | 30094    | 4     | uint64 ÷100 | Cumulative home consumption, kWh                              |
 | smart-load energy block    | 30098    | 48    | uint32 ÷100 | Lifetime energy per Smart Port load, 24 slots of 2 words, kWh |
-| smart-load power block     | 30146    | 48    | int32 W     | Live power per Smart Port load, 24 slots of 2 words |
-| `thirdPartyPvPower`        | 30194    | 2     | int32 W     | Third-party (AC-coupled) solar, 0 without one |
-| `lifetimeBatteryCharge`    | 30200    | 4     | uint64 ÷100 | Cumulative battery charge, kWh                |
-| `lifetimeBatteryDischarge` | 30204    | 4     | uint64 ÷100 | Cumulative battery discharge, kWh             |
-| `lifetimeGridImport`       | 30216    | 4     | uint64 ÷100 | Cumulative grid import, kWh                   |
-| `lifetimeGridExport`       | 30220    | 4     | uint64 ÷100 | Cumulative grid export, kWh                   |
-| `generalLoadPower`         | 30282    | 2     | int32 W     | House load excluding EV chargers/smart loads  |
-| `loadPower`                | 30284    | 2     | int32 W     | Home consumption (total, includes EV)         |
+| smart-load power block     | 30146    | 48    | int32 W     | Live power per Smart Port load, 24 slots of 2 words           |
+| `thirdPartyPvPower`        | 30194    | 2     | int32 W     | Third-party (AC-coupled) solar, 0 without one                 |
+| `lifetimeBatteryCharge`    | 30200    | 4     | uint64 ÷100 | Cumulative battery charge, kWh                                |
+| `lifetimeBatteryDischarge` | 30204    | 4     | uint64 ÷100 | Cumulative battery discharge, kWh                             |
+| `lifetimeGridImport`       | 30216    | 4     | uint64 ÷100 | Cumulative grid import, kWh                                   |
+| `lifetimeGridExport`       | 30220    | 4     | uint64 ÷100 | Cumulative grid export, kWh                                   |
+| `generalLoadPower`         | 30282    | 2     | int32 W     | House load excluding EV chargers/smart loads                  |
+| `loadPower`                | 30284    | 2     | int32 W     | Home consumption (total, includes EV)                         |
 
 Solar is the sum of two registers, not one. `pvPower` (what the dashboard and HomeKit show) is `sigenPvPower` (30035, the Sigenergy DC arrays) plus `thirdPartyPvPower` (30194, an AC-coupled third-party inverter the gateway meters via a CT sensor). On a system with no third-party PV the second register reads 0, so `pvPower` equals `sigenPvPower`. `generalLoadPower` (30282) is the house load with the EV chargers and trackable smart loads removed, alongside the total at 30284.
 
@@ -308,7 +309,7 @@ Everything runs through one Express app on `SERVER_PORT` (default 5163). Reads a
 | GET           | `/api/settings`                              | Public settings, with secrets stripped                                         | open     |
 | GET           | `/api/homekit/pairing`                       | HomeKit setup URI, pairing code, and QR                                        | passcode |
 | PUT           | `/api/settings`                              | Update settings                                                                | passcode |
-| POST          | `/api/settings/reset`                        | Reset settings to the env seeds                                                | passcode |
+| POST          | `/api/settings/reset`                        | Reset settings to the env seeds (keeps history)                                | passcode |
 | POST          | `/api/unlock`, `/api/lock`                   | Open or revoke a settings session                                              | open     |
 | POST · DELETE | `/api/security/passcode`                     | Set or clear the passcode                                                      | passcode |
 | POST          | `/api/test/gateway`, `/api/discover/gateway` | Test one gateway or sweep the LAN                                              | passcode |
@@ -384,7 +385,7 @@ sequenceDiagram
   B-->>G: current readings from state
 ```
 
-The bridge ships a stub OAuth that accepts anything and returns a static bearer (`GOOGLE_AUTH_TOKEN`); this is for personal use only.
+The bridge ships a minimal OAuth for personal use that hands Google a static bearer: the Auth token in Settings → Google Home (seeded from `GOOGLE_AUTH_TOKEN`). `/auth` redirects only to Google's account-linking addresses (`https://oauth-redirect.googleusercontent.com/r/…` and its sandbox twin), with a random one-time code that expires after 10 minutes. `/token` first checks that the client secret, sent in the form body or as HTTP Basic auth, equals the auth token. It then trades a valid code (once) or a refresh token equal to the auth token for the bearer. The Client ID is not checked.
 
 Google's device model is stricter than HomeKit's, so the readings map to two different traits. The battery is a genuine energy store, so it uses the `EnergyStorage` trait on a `SENSOR` device: the bridge reports `descriptiveCapacityRemaining` (Critically low through Full, mapped from the state of charge), the percentage, and charging state, and Google draws a real battery tile.
 
@@ -396,7 +397,7 @@ Both halves are configurable in Settings → Google Home, since Google's trade-o
 
 A Cloudflare Tunnel exposes the bridge over HTTPS without opening a port on your router. Google Home requires it (Google's servers call a public fulfillment URL rather than reaching your LAN), and it's also the cleanest way to reach the dashboard itself from outside; pair it with Cloudflare Access ([below](#remote-access-with-cloudflare-access)) and you get an authenticated public URL with no VPN.
 
-You need a domain on Cloudflare for this. The bundled sidecar uses a remotely-managed (token) tunnel, which routes a public hostname on a domain you've added to your Cloudflare account; any domain on the free plan works, and you can register one through Cloudflare if you don't have one. That requirement is real: Cloudflare's free `*.trycloudflare.com` quick tunnels hand you a throwaway URL that changes on every restart and can't be gated with Access, so they suit neither a stable Google fulfillment URL nor a gated dashboard. Create the tunnel in Cloudflare Zero Trust, route your hostname to `http://localhost:5163`, copy the token into `CLOUDFLARE_TUNNEL_TOKEN`, then start the sidecar with its profile:
+You need a domain on Cloudflare for this. The bundled sidecar uses a remotely-managed (token) tunnel, which routes a public hostname on a domain you've added to your Cloudflare account; any domain on the free plan works, and you can register one through Cloudflare if you don't have one. That requirement is real: Cloudflare's free `*.trycloudflare.com` quick tunnels hand you a throwaway URL that changes on every restart and can't be gated with Access, so they suit neither a stable Google fulfillment URL nor a gated dashboard. Create the tunnel in Cloudflare Zero Trust, route your hostname to `http://localhost:5163`, copy the token into `CLOUDFLARE_TUNNEL_TOKEN`, and add the hostname to `ALLOWED_HOSTS` (for example `ALLOWED_HOSTS=sigen.example.com`). Without that entry the dashboard loads but every `/api` call returns `403`. Then start the sidecar with its profile:
 
 ```bash
 docker compose --profile tunnel up -d
@@ -413,7 +414,7 @@ The tunnel alone publishes the dashboard to anyone who learns the hostname, and 
 Set it up in Zero Trust → Access → Applications:
 
 1. **Gate the whole hostname.** Add a self-hosted application whose domain is your tunnel hostname with no path, and give it one policy: action **Allow**, include **Emails** = your address (add more for family). With no external identity provider configured, Cloudflare's built-in **One-time PIN** is the login method, so a visitor enters an allowed email, gets a one-time code by email, and is let in; nothing else to wire up.
-2. **If you use Google Home, exempt its fulfillment paths.** Google's servers can't do an interactive login, so add a second self-hosted application scoped to the machine-to-machine paths (`/fulfillment`, `/auth`, and `/token` on the same hostname) with one policy: action **Bypass**, include **Everyone**. Access evaluates Bypass first and the most specific hostname-plus-path match wins, so those paths stay public while everything else stays gated. They remain guarded only by the shared Google token (`GOOGLE_AUTH_TOKEN`), so keep it secret. If you don't run Google Home, skip this second app and the entire hostname is gated.
+2. **If you use Google Home, exempt its fulfillment paths.** Google's servers can't do an interactive login, so add a second self-hosted application scoped to the machine-to-machine paths (`/fulfillment`, `/auth`, and `/token` on the same hostname) with one policy: action **Bypass**, include **Everyone**. Access evaluates Bypass first and the most specific hostname-plus-path match wins, so those paths stay public while everything else stays gated. They remain guarded only by the shared Google token (`GOOGLE_AUTH_TOKEN`): `/fulfillment` needs it as the bearer, `/token` needs it as the OAuth client secret, and `/auth` only redirects back to Google. Set it to a long random value and keep it secret. If you don't run Google Home, skip this second app and the entire hostname is gated.
 3. **Confirm it's live.** From off your LAN, `curl -sS -o /dev/null -w "%{http_code} %{redirect_url}\n" https://<your-host>/api/state` should return a `302` to `<your-team>.cloudflareaccess.com`, and a bypassed Google path (for example `/token`) should not redirect there. Edge changes propagate in well under a minute.
 
 ## Local development
@@ -499,6 +500,8 @@ sigen-home-bridge/
 │   ├── schedule.js     resolves the poll interval from time windows
 │   ├── settings.js     persisted, live-editable config (all sections) + listeners
 │   ├── security.js     optional settings passcode: scrypt hash, session tokens, lockout
+│   ├── oauth.js        Google account-linking OAuth: /auth one-time codes, /token checks
+│   ├── hosts.js        Host allow-list and same-origin JSON check for /api and /events
 │   ├── weather.js      outdoor temperature from Open-Meteo
 │   ├── state.js        shared in-memory state and pub/sub
 │   ├── history.js      reading history in SQLite (write-through), retention + CSV/JSON export
@@ -508,7 +511,7 @@ sigen-home-bridge/
 │   ├── alerts.js       alert engine: evaluates the alert list, debounce, dispatch
 │   ├── homekit.js      HAP bridge and accessories
 │   ├── google.js       Google Smart Home intent handlers
-│   ├── server.js       Express app: SSE, REST, static UI, stub OAuth, passcode gate
+│   ├── server.js       Express app: SSE, REST, static UI, route wiring, passcode gate
 │   ├── probe.js        one-shot Modbus read for verification
 │   └── tests/          Vitest unit tests
 ├── ui/                 Vue 3 + Vite + Tailwind dashboard
@@ -541,7 +544,7 @@ Run from the repository root.
 | `npm run probe`       | Read the gateway once and print decoded values                     |
 | `npm run screenshots` | Recapture the README screenshots (Docker + Playwright)             |
 | `npm run walkthrough` | Record the README walkthrough video (Docker + Playwright + ffmpeg) |
-| `npm run og`          | Regenerate the docs social preview card (Docker + Playwright)       |
+| `npm run og`          | Regenerate the docs social preview card (Docker + Playwright)      |
 
 ## Verifying the gateway
 
@@ -561,10 +564,19 @@ Reads it does not recognise are skipped rather than fatal, so a clean run agains
 
 ## Security model
 
-The dashboard and its read APIs (state, history, settings, SSE) have no authentication, and the `/auth` and `/token` OAuth endpoints are stubs that accept any credentials. Setting a 4-digit passcode under Settings → Security raises the floor: the routes that change configuration (`PUT /api/settings`, `POST /api/settings/reset`, and the passcode routes) require a session token; the diagnostic and pairing routes (`/api/test/*`, `/api/discover/gateway`, `/api/homekit/pairing`) require it too; and an unauthenticated read of `/api/settings` blanks the values worth hiding (the gateway host, the HomeKit pairing PIN, and each alert's webhook URL) until a valid token unlocks them. Separately, `/fulfillment` checks the Google bearer with a timing-safe compare whenever `GOOGLE_AUTH_TOKEN` is set, so Google's calls carry the token the stub `/token` handed them.
+The dashboard and its read APIs (state, history, settings, SSE) have no authentication. Setting a 4-digit passcode under Settings → Security raises the floor: the routes that change configuration (`PUT /api/settings`, `POST /api/settings/reset`, and the passcode routes) require a session token; the diagnostic and pairing routes (`/api/test/*`, `/api/discover/gateway`, `/api/homekit/pairing`) require it too; and an unauthenticated read of `/api/settings` blanks the values worth hiding (the gateway host, the HomeKit pairing PIN, and each alert's webhook URL) until a valid token unlocks them. Separately, the Google paths check the Google auth token (the Auth token in Settings → Google Home, seeded from `GOOGLE_AUTH_TOKEN`) with a timing-safe compare. `/fulfillment` needs it as the bearer, and `/token` needs it as the OAuth client secret before it hands the bearer out. `/auth` only redirects to Google's account-linking addresses, with a random one-time code that expires after 10 minutes. With no token set, `/fulfillment` refuses every call.
 
-The passcode is stored as a salted scrypt hash in the `security` section of `settings.json`; the plaintext is never written, and the API returns only `passcodeSet: true|false`, never the hash. `POST /api/unlock` checks a submitted passcode and, on a match, hands back an in-memory session token (12-hour TTL) that the browser keeps in `sessionStorage` and sends as `Authorization: Bearer …` on every mutating call. Five wrong tries trips a one-minute lockout. Tokens live in server memory only, so a restart logs everyone out while the hash persists. When no passcode is set the gate is open, which is how you set the first one.
+The passcode is stored as a salted scrypt hash in the `security` section of `settings.json`; the plaintext is never written, and the API returns only `passcodeSet: true|false`, never the hash. `POST /api/unlock` checks a submitted passcode and, on a match, hands back an in-memory session token (12-hour TTL) that the browser keeps in `sessionStorage` and sends as `Authorization: Bearer …` on every mutating call. Five wrong tries from one client lock out that client only: for one minute at first, doubling on each repeat up to an hour, and reset by a correct passcode. The bridge tells clients apart by network address, or by the `cf-connecting-ip` header when the request comes from a local `cloudflared`. IPv6 clients are grouped by their `/64` network. Across all clients, 50 wrong tries within an hour lock everyone out until the oldest of those tries is an hour old. Tokens live in server memory only, so a restart logs everyone out while the hash persists. When no passcode is set the gate is open, which is how you set the first one.
 
-This is a deterrent against casual changes on a shared LAN, not real auth: reads stay open and it rides plain HTTP with no user accounts behind it. The recovery path if you forget the passcode is the server file: delete `settings.json` (or remove its `security` block) and restart, or reset configuration from another unlocked session. Keep the raw service off the public internet; to reach it remotely, front the tunnel with Cloudflare Access ([Remote access with Cloudflare Access](#remote-access-with-cloudflare-access)), which authenticates at the edge before any request reaches the origin and so supplies the login the app itself lacks. The Google fulfillment path is the deliberate exception that stays public, since Google's servers can't sign in, so treat `GOOGLE_AUTH_TOKEN` as a shared secret rather than real auth.
+This is a deterrent against casual changes on a shared LAN, not real auth: reads stay open and it rides plain HTTP with no user accounts behind it. The recovery path if you forget the passcode is the server file: delete `settings.json` (or remove its `security` block) and restart, or reset configuration from another unlocked session. Keep the raw service off the public internet; to reach it remotely, front the tunnel with Cloudflare Access ([Remote access with Cloudflare Access](#remote-access-with-cloudflare-access)), which authenticates at the edge before any request reaches the origin and so supplies the login the app itself lacks. The Google paths are the deliberate exception that stays public, since Google's servers can't sign in. They're only as strong as the Google auth token, so set it to a long random value and keep it secret. The bridge logs a `[google]` warning at startup if the token is still the old public default `sigen-home-bridge-token`.
+
+Every `/api` and `/events` request must name an allowed host in its `Host` header. This blocks DNS rebinding, where a hostile site points its own domain at your LAN address. The allowed hosts are:
+
+- IP addresses and `localhost`
+- single-label names such as `homeserver`
+- names ending in `.local`, `.lan`, `.home.arpa`, or `.internal`
+- each name listed in `ALLOWED_HOSTS` (comma-separated)
+
+Any other host gets a `403` that names `ALLOWED_HOSTS`. A Cloudflare tunnel or any custom DNS name (one with a dot that isn't on the LAN list) needs its hostname in `ALLOWED_HOSTS`, or every `/api` call returns `403`. The Google paths don't need it. Each `POST`, `PUT`, and `DELETE` under `/api` must also send `Content-Type: application/json`. If it carries an `Origin` header, that origin must match the `Host`. The Vite dev proxy strips `Origin` from the requests it forwards. A plain cross-site form meets neither rule, so another site can't change or reset your settings through your browser, passcode or not. The Google paths and the static dashboard files skip these checks.
 
 On the client, the 4-digit entry is one component (`PinPad.vue`) with two input modes chosen by `(hover: hover)`: touch devices get a tappable keypad that auto-submits on the fourth digit, hover-capable (desktop) devices get a styled keyboard text field instead of the dot grid. The Security settings section sets or changes the passcode with the same component in a choose-then-confirm sequence. In landscape the keypad reflows to two columns (header beside the grid) so it never needs scrolling: a phone, short on height, gets compact keys, while a tablet gets the same two columns scaled up to fill the screen with full-size keys. That split keys on the landscape viewport height rather than its width, because iOS Safari can report a width small enough under display zoom to mistake a tablet for a phone. `PasscodeGate.vue` is a fullscreen takeover rather than a card sitting under the settings header: it drops the usual settings chrome and offers a labelled Cancel that backs out to wherever you came from (dashboard or trends) without unlocking. Cancel sits where the eye already is, so it follows the layout: under the keypad in portrait, under the text field on desktop, and under the left-column text in the landscape two-column form (one button per position, toggled by the same media query); on desktop the Escape key does the same thing. Because the gate animates away moments after it succeeds, it works to hold its layout still: on success Cancel mutes in place rather than unmounting, the landscape form pins its two columns to equal halves so the keypad never slides when the status text changes, and in that form the status splits onto two lines ("Incorrect passcode." over "3 tries left.") instead of reflowing the column width. It verifies the code, plays a brief lock-springs-open success animation, holds for a beat, then commits the returned token. A wrong try and the lockout countdown replace the "Enter your passcode to access." prompt in place (red for a bad attempt, amber while locked out) and clear on the next keypress, so a failed attempt recolours one line instead of appending a second one and shifting the layout; on success that same line turns green and reads "Access granted." through the celebration. That verify-then-commit split is deliberate: committing the token flips the gate off and reveals Settings, so the animation runs first and the commit lands at the end, otherwise the celebration would be cut short. `prefers-reduced-motion` collapses it to a quick fade.

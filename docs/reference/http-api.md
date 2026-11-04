@@ -18,7 +18,7 @@ Everything runs through one Express app on `SERVER_PORT` (default 5163). Reads a
 | GET           | `/api/settings`                              | Public settings, with secrets stripped                                         | open     |
 | GET           | `/api/homekit/pairing`                       | HomeKit setup URI, pairing code, and QR                                        | passcode |
 | PUT           | `/api/settings`                              | Update settings                                                                | passcode |
-| POST          | `/api/settings/reset`                        | Reset settings to the env seeds                                                | passcode |
+| POST          | `/api/settings/reset`                        | Reset settings to the env seeds (keeps history)                                | passcode |
 | POST          | `/api/unlock`, `/api/lock`                   | Open or revoke a settings session                                              | open     |
 | POST · DELETE | `/api/security/passcode`                     | Set or clear the passcode                                                      | passcode |
 | POST          | `/api/test/gateway`, `/api/discover/gateway` | Test one gateway or sweep the LAN                                              | passcode |

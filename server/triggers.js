@@ -1,7 +1,8 @@
-export const getTrigger = (type) => catalogue().find((trigger) => trigger.type === type)
+export const getTrigger = (type, { units } = {}) =>
+  catalogue(units).find((trigger) => trigger.type === type)
 
 export const serializeTriggers = (context) =>
-  catalogue().map(({ type, label, group, params, contactHint, defaultNotify, available }) => ({
+  catalogue(context.units).map(({ type, label, group, params, contactHint, defaultNotify, available }) => ({
     type,
     label,
     group,
@@ -11,7 +12,19 @@ export const serializeTriggers = (context) =>
     available: available(context)
   }))
 
-const catalogue = () => (cache ??= [
+export const convertTriggerUnits = ({ trigger, from, to }) => {
+  if (!TEMPERATURE_TRIGGERS.includes(trigger?.type)) return trigger
+  if (!TEMPERATURE_RANGES[from] || !TEMPERATURE_RANGES[to] || from === to) return trigger
+  if (!Number.isFinite(trigger.threshold)) return trigger
+  return { ...trigger, threshold: Math.round(convertTemperature({ value: trigger.threshold, from, to })) }
+}
+
+const catalogue = (units) => {
+  const scale = TEMPERATURE_RANGES[units] ? units : 'celsius'
+  return (caches[scale] ??= buildCatalogue(TEMPERATURE_RANGES[scale]))
+}
+
+const buildCatalogue = (temperature) => [
   gatewayOffline,
   threshold({
     type: 'batteryBelow', label: 'Battery low', group: 'Battery',
@@ -73,7 +86,8 @@ const catalogue = () => (cache ??= [
   threshold({
     type: 'outdoorTempAbove', label: 'Hot outside', group: 'Weather',
     signal: (ctx) => ctx.outdoorTemp, comparison: 'above',
-    paramLabel: 'Temperature at or above', unit: '°', min: -50, max: 60, default: 35, hysteresis: 1,
+    paramLabel: 'Temperature at or above', unit: '°',
+    min: temperature.min, max: temperature.max, default: temperature.hot, hysteresis: 1,
     available: (ctx) => ctx.weatherEnabled,
     contactHint: 'Open while it is hot out',
     describe: ({ value }) => `Outdoor temperature is ${Math.round(value)}°`
@@ -81,7 +95,8 @@ const catalogue = () => (cache ??= [
   threshold({
     type: 'outdoorTempBelow', label: 'Cold outside', group: 'Weather',
     signal: (ctx) => ctx.outdoorTemp, comparison: 'below',
-    paramLabel: 'Temperature at or below', unit: '°', min: -50, max: 60, default: 2, hysteresis: 1,
+    paramLabel: 'Temperature at or below', unit: '°',
+    min: temperature.min, max: temperature.max, default: temperature.cold, hysteresis: 1,
     available: (ctx) => ctx.weatherEnabled,
     contactHint: 'Open while it is cold out',
     describe: ({ value }) => `Outdoor temperature is ${Math.round(value)}°`
@@ -94,7 +109,7 @@ const catalogue = () => (cache ??= [
     contactHint: 'Open while the grid is costing a lot',
     describe: ({ value }) => `Grid is costing ${(value ?? 0).toFixed(2)} per hour`
   })
-])
+]
 
 const threshold = ({
   type, label, group, unit, signal, comparison,
@@ -173,7 +188,17 @@ const roundReading = (value) =>
 
 const comparisonLabel = (direction) => direction === 'below' ? 'atOrBelow' : 'atOrAbove'
 
-let cache = null
+const convertTemperature = ({ value, from, to }) =>
+  from === 'celsius' && to === 'fahrenheit' ? value * 9 / 5 + 32 : (value - 32) * 5 / 9
+
+const caches = {}
+
+const TEMPERATURE_TRIGGERS = ['outdoorTempAbove', 'outdoorTempBelow']
+
+const TEMPERATURE_RANGES = {
+  celsius: { min: -50, max: 60, hot: 35, cold: 2 },
+  fahrenheit: { min: -58, max: 140, hot: 95, cold: 36 }
+}
 
 const THRESHOLD_ARM_MS = 120000
 

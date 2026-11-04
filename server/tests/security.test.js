@@ -1,6 +1,6 @@
 import { rmSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const dataDir = fileURLToPath(new URL('../../tmp/test-data-security', import.meta.url))
 
@@ -20,10 +20,18 @@ const reply = () => {
   return response
 }
 
-const call = (handler, { body = {}, token } = {}) => {
-  const headers = token ? { authorization: `Bearer ${token}` } : {}
+const call = (handler, { body = {}, token, socket, headers: extra = {} } = {}) => {
+  const headers = { ...(token ? { authorization: `Bearer ${token}` } : {}), ...extra }
   const response = reply()
-  handler({ body, headers }, response)
+  handler({ body, headers, socket }, response)
+  return response
+}
+
+const failUntilLocked = (options = {}) => {
+  let response
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    response = call(unlock, { body: { passcode: '0000' }, ...options })
+  }
   return response
 }
 
@@ -221,5 +229,95 @@ describe('google fulfillment auth', () => {
 
   it('rejects a wrong token', () => {
     expect(googleGate('not-the-token').passed).toBe(false)
+  })
+})
+
+describe('google fulfillment auth with no token configured', () => {
+  it('denies every request', () => {
+    const saved = getSettings().google.authToken
+    getSettings().google.authToken = ''
+    const { passed, response } = googleGate()
+    getSettings().google.authToken = saved
+    expect(passed).toBe(false)
+    expect(response.statusCode).toBe(401)
+  })
+})
+
+describe('per-client lockout', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    setPasscode({ body: { passcode: '1357' }, headers: {} }, reply())
+  })
+
+  afterEach(() => vi.useRealTimers())
+
+  it('ignores cf-connecting-ip from a non-loopback socket', () => {
+    const socket = { remoteAddress: '192.0.2.44' }
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const headers = { 'cf-connecting-ip': `203.0.113.${attempt}` }
+      call(unlock, { body: { passcode: '0000' }, socket, headers })
+    }
+    const headers = { 'cf-connecting-ip': '203.0.113.99' }
+    const response = call(unlock, { body: { passcode: '1357' }, socket, headers })
+    expect(response.statusCode).toBe(429)
+  })
+
+  it('doubles the lockout on each repeat and caps it at an hour', () => {
+    const socket = { remoteAddress: '192.0.2.45' }
+    const delays = []
+    for (let round = 0; round < 8; round += 1) {
+      const response = failUntilLocked({ socket })
+      delays.push(response.body.retryAfter)
+      vi.advanceTimersByTime(response.body.retryAfter * 1000 + 1)
+    }
+    expect(delays).toEqual([60, 120, 240, 480, 960, 1920, 3600, 3600])
+  }, 60000)
+
+  it('never applies the hourly ceiling to LAN clients', () => {
+    for (let client = 0; client < 10; client += 1) {
+      failUntilLocked({ socket: { remoteAddress: `198.51.100.${client}` } })
+    }
+    const owner = { remoteAddress: '192.0.2.200' }
+    expect(call(unlock, { body: { passcode: '1357' }, socket: owner }).statusCode).toBe(200)
+  }, 60000)
+
+  it('locks new tunnel clients once tunnel failures reach the hourly ceiling', () => {
+    const loopback = { remoteAddress: '127.0.0.1' }
+    for (let client = 0; client < 10; client += 1) {
+      failUntilLocked({ socket: loopback, headers: { 'cf-connecting-ip': `203.0.113.${client}` } })
+    }
+    const tunnelOwner = { socket: loopback, headers: { 'cf-connecting-ip': '198.51.100.77' } }
+    const locked = call(unlock, { body: { passcode: '1357' }, ...tunnelOwner })
+    expect(locked.statusCode).toBe(429)
+    const lanOwner = { remoteAddress: '192.0.2.201' }
+    expect(call(unlock, { body: { passcode: '1357' }, socket: lanOwner }).statusCode).toBe(200)
+    vi.advanceTimersByTime(locked.body.retryAfter * 1000 + 1)
+    expect(call(unlock, { body: { passcode: '1357' }, ...tunnelOwner }).statusCode).toBe(200)
+  }, 60000)
+
+  it('shares one lockout across an IPv6 /64', () => {
+    failUntilLocked({ socket: { remoteAddress: '2001:db8:1:2::5' } })
+    const sibling = { remoteAddress: '2001:db8:1:2:ffff::9' }
+    expect(call(unlock, { body: { passcode: '1357' }, socket: sibling }).statusCode).toBe(429)
+    const neighbour = { remoteAddress: '2001:db8:1:3::5' }
+    expect(call(unlock, { body: { passcode: '1357' }, socket: neighbour }).statusCode).toBe(200)
+  })
+
+  it('resets the doubling after a successful unlock', () => {
+    const socket = { remoteAddress: '192.0.2.46' }
+    vi.advanceTimersByTime(failUntilLocked({ socket }).body.retryAfter * 1000 + 1)
+    expect(call(unlock, { body: { passcode: '1357' }, socket }).statusCode).toBe(200)
+    expect(failUntilLocked({ socket }).body.retryAfter).toBe(60)
+  })
+})
+
+describe('session pruning', () => {
+  it('evicts the oldest session once the cap is reached', () => {
+    const first = call(unlock).body.token
+    const tokens = Array.from({ length: 100 }, () => call(unlock).body.token)
+    updateSecurity({ passcode: hashPasscode('4242') })
+    expect(gate(first).passed).toBe(false)
+    expect(gate(tokens[0]).passed).toBe(true)
+    expect(gate(tokens.at(-1)).passed).toBe(true)
   })
 })

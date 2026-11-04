@@ -42,8 +42,10 @@ export const decodePower = (response) => response.buffer.readInt32BE(0)
 
 export const decodeSoc = (response) => response.data[0] / 10
 
-export const deriveBatteryPower = ({ pvPower, gridPower, loadPower }) =>
-  pvPower + gridPower - loadPower
+export const deriveBatteryPower = ({ pvPower, gridPower, loadPower }) => {
+  if (![pvPower, gridPower, loadPower].every(Number.isFinite)) return null
+  return pvPower + gridPower - loadPower
+}
 
 export const solarTotal = ({ sigenPvPower, thirdPartyPvPower }) =>
   (sigenPvPower ?? 0) + (thirdPartyPvPower ?? 0)
@@ -57,6 +59,7 @@ const client = new ModbusRTU()
 const connect = async () => {
   const epoch = ++generation
   unsupportedRegisters.clear()
+  transientFailures.clear()
   smartLoadsSupported = true
   const { host, port, unitId } = getSettings().sigen
   try {
@@ -91,15 +94,7 @@ const poll = async (epoch) => {
     client.setID(getSettings().sigen.unitId)
     const readings = {}
     for (const [key, register] of Object.entries(REGISTERS)) {
-      if (unsupportedRegisters.has(key)) continue
-      try {
-        const response = await client.readInputRegisters(register.address, register.length)
-        readings[key] = register.decode(response)
-      } catch (error) {
-        if (!isModbusException(error)) throw error
-        log(`${key} (${register.address}) not supported by firmware; skipping`)
-        unsupportedRegisters.add(key)
-      }
+      readings[key] = await readRegister(key, register)
     }
     readings.pvPower = solarTotal(readings)
     readings.batteryPower = deriveBatteryPower(readings)
@@ -116,6 +111,35 @@ const poll = async (epoch) => {
   } catch (error) {
     if (epoch === generation) handleFailure(error)
   }
+}
+
+const readRegister = async (key, register) => {
+  if (unsupportedRegisters.has(key)) return null
+  try {
+    const value = register.decode(await client.readInputRegisters(register.address, register.length))
+    transientFailures.delete(key)
+    return value
+  } catch (error) {
+    if (!isModbusException(error)) throw error
+    if (isUnsupportedException(error)) {
+      log(`${key} (${register.address}) not supported by firmware; skipping`)
+      unsupportedRegisters.add(key)
+    } else {
+      return lastValueWithinLimit(key, register, error)
+    }
+    return null
+  }
+}
+
+const lastValueWithinLimit = (key, register, error) => {
+  const failures = (transientFailures.get(key) ?? 0) + 1
+  transientFailures.set(key, failures)
+  if (failures > MAX_TRANSIENT_FAILURES) {
+    log(`${key} (${register.address}) read failed ${failures} times in a row: ${error.message}; clearing value`)
+    return null
+  }
+  log(`${key} (${register.address}) read failed: ${error.message}; keeping last value this poll`)
+  return state[key]
 }
 
 const readDevices = async () => {
@@ -150,7 +174,7 @@ const readLabelledSmartLoads = async () => {
     const labels = getSettings().smartLoads.labels
     return (await readSmartLoads(client)).map((load) => ({ ...load, name: smartLoadName(load, labels) }))
   } catch (error) {
-    if (isModbusException(error)) {
+    if (isUnsupportedException(error)) {
       smartLoadsSupported = false
       log('smart-load registers not supported by firmware; skipping')
     } else {
@@ -204,15 +228,19 @@ const closeQuietly = () => {
 
 const logPoll = (interval) => {
   log(
-    `[poll] SOC: ${state.batterySoc}% | PV: ${kw(state.pvPower)}kW | ` +
-    `Grid: ${kw(state.gridPower)}kW | Bat: ${kw(state.batteryPower)}kW | ` +
-    `Load: ${kw(state.loadPower)}kW | next ${interval}ms`
+    `[poll] SOC: ${percent(state.batterySoc)} | PV: ${kw(state.pvPower)} | ` +
+    `Grid: ${kw(state.gridPower)} | Bat: ${kw(state.batteryPower)} | ` +
+    `Load: ${kw(state.loadPower)} | next ${interval}ms`
   )
 }
 
 const isModbusException = (error) => error.message.startsWith('Modbus exception')
 
-const kw = (watts) => (watts / 1000).toFixed(1)
+const isUnsupportedException = (error) => UNSUPPORTED_EXCEPTION_CODES.has(error.modbusCode)
+
+const kw = (watts) => (Number.isFinite(watts) ? `${(watts / 1000).toFixed(1)}kW` : MISSING_READING)
+
+const percent = (soc) => (Number.isFinite(soc) ? `${soc}%` : MISSING_READING)
 
 const log = (message) => console.log(`[modbus] ${message}`)
 
@@ -226,11 +254,19 @@ let smartLoadsSupported = true
 
 const unsupportedRegisters = new Set()
 
+const transientFailures = new Map()
+
 const SOCKET_TIMEOUT_MS = 5000
 
 const TEST_TIMEOUT_MS = 3000
 
 const RECONNECT_DEBOUNCE_MS = 250
+
+const UNSUPPORTED_EXCEPTION_CODES = new Set([1, 2])
+
+const MISSING_READING = '-'
+
+const MAX_TRANSIENT_FAILURES = 3
 
 const REGISTERS = {
   gridPower: { address: 30005, length: 2, decode: decodePower },

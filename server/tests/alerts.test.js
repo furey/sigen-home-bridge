@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { stepRule } from '../alerts.js'
 import { getTrigger, serializeTriggers } from '../triggers.js'
 
@@ -139,5 +139,38 @@ describe('trigger catalogue', () => {
     expect(available('gatewayOffline')).toBe(true)
     const on = serializeTriggers({ weatherEnabled: true, tariffConfigured: true, batterySohPresent: true })
     expect(on.find((trigger) => trigger.type === 'outdoorTempAbove').available).toBe(true)
+  })
+})
+
+describe('startAlerts', () => {
+  it('logs a failed tick instead of throwing', async () => {
+    vi.resetModules()
+    vi.doMock('../settings.js', () => ({
+      getSettings: () => ({
+        alerts: { items: [] },
+        battery: { capacityKwh: 10, reserveSoc: 0 },
+        tariff: { importRate: 0, exportRate: 0, importWindows: [], exportWindows: [], supplyChargePerDay: 0,
+          zeroDrawCredit: { enabled: false }, superExportCredit: { enabled: false } },
+        weather: { enabled: false }
+      })
+    }))
+    vi.doMock('../history.js', () => ({
+      getHistoryAll: () => {
+        throw new Error('history unavailable')
+      }
+    }))
+    vi.useFakeTimers()
+    const logged = vi.spyOn(console, 'log').mockImplementation(() => {})
+    try {
+      const { startAlerts } = await import('../alerts.js')
+      expect(() => startAlerts()).not.toThrow()
+      await vi.advanceTimersByTimeAsync(15000)
+      expect(logged).toHaveBeenCalledWith('[alerts] tick failed: history unavailable')
+    } finally {
+      vi.useRealTimers()
+      logged.mockRestore()
+      vi.doUnmock('../settings.js')
+      vi.doUnmock('../history.js')
+    }
   })
 })

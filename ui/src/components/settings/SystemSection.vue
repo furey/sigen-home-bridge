@@ -252,9 +252,10 @@ function buildPatch() {
     <div class="flex items-center gap-2 mb-3 text-sm text-red-300">
       <Trash2 class="w-4 h-4" />Danger zone
     </div>
-    <p class="mb-3 text-sm text-zinc-400">
-      Reset configuration wipes <code>settings.json</code> back to the environment defaults and
-      re-runs the setup wizard. Your HomeKit pairing is untouched.
+    <p class="mb-3 text-sm text-zinc-400 text-pretty">
+      Reset configuration returns every other setting to the environment defaults, removes the
+      passcode, and re-runs the setup wizard. It keeps your history retention, stored history, and
+      HomeKit pairing as they are.
     </p>
     <button
       class="px-4 py-2 text-sm font-medium bg-red-600 rounded-xl hover:bg-red-500 disabled:opacity-50"
@@ -341,9 +342,10 @@ function buildPatch() {
         <div class="flex items-center gap-2 mb-3 text-sm text-red-300">
           <Trash2 class="w-4 h-4" />Reset configuration?
         </div>
-        <p class="mb-4 text-sm text-zinc-400">
-          This wipes <code>settings.json</code> back to defaults and re-runs the setup wizard.
-          Your HomeKit pairing is untouched. This can't be undone.
+        <p class="mb-4 text-sm text-zinc-400 text-pretty">
+          This keeps your history retention, stored history, and HomeKit pairing. Every other
+          setting in <code>settings.json</code> returns to its default, the passcode is removed, and
+          the setup wizard runs again. You can't undo this.
         </p>
         <div class="flex justify-end gap-3">
           <button

@@ -13,9 +13,9 @@ export default defineConfig(({ mode }) => {
     plugins: [vue(), tailwindcss()],
     server: {
       proxy: {
-        '/events': { target, changeOrigin: true },
-        '/api': { target, changeOrigin: true },
-        '/fulfillment': { target, changeOrigin: true }
+        '/events': bridgeProxy(target),
+        '/api': bridgeProxy(target),
+        '/fulfillment': bridgeProxy(target)
       }
     },
     build: {
@@ -23,6 +23,12 @@ export default defineConfig(({ mode }) => {
       emptyOutDir: true
     }
   }
+})
+
+const bridgeProxy = (target) => ({
+  target,
+  changeOrigin: true,
+  configure: (proxy) => proxy.on('proxyReq', (proxyReq) => proxyReq.removeHeader('origin'))
 })
 
 const bridgePort = (env) => savedPort() ?? env.SERVER_PORT ?? 5163

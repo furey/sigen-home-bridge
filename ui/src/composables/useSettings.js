@@ -53,7 +53,10 @@ export const useSettings = () => {
   }
 
   const reset = async () => {
-    const response = await fetch('/api/settings/reset', { method: 'POST', headers: authHeaders() })
+    const response = await fetch('/api/settings/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() }
+    })
     if (response.status === 401) {
       useSession().clearToken()
       throw new Error('Settings are locked')
@@ -90,13 +93,19 @@ export const useSettings = () => {
     }
   }
 
-  const commitSession = (token) => {
+  const commitSession = async (token) => {
     useSession().setToken(token)
-    return reload()
+    try {
+      return await reload()
+    } catch (reloadError) {
+      error.value = reloadError.message
+      status.value = 'error'
+      return data
+    }
   }
 
   const lock = async () => {
-    const headers = authHeaders()
+    const headers = { 'Content-Type': 'application/json', ...authHeaders() }
     useSession().clearToken()
     try {
       await fetch('/api/lock', { method: 'POST', headers })
@@ -156,8 +165,23 @@ const undismiss = () => {
   } catch {}
 }
 
-const fetchSettings = async () =>
-  (await fetch('/api/settings', { headers: authHeaders() })).json()
+const fetchSettings = async () => {
+  const response = await fetch('/api/settings', { headers: authHeaders() })
+  const body = await response.json().catch(() => ({}))
+  if (response.ok) return body
+  const message = body.error ?? 'Could not load settings'
+  if (isHostRefusal(response, message)) announceHostRefusal(message)
+  throw new Error(message)
+}
+
+const isHostRefusal = (response, message) =>
+  response.status === 403 && message.includes('ALLOWED_HOSTS')
+
+const announceHostRefusal = (message) => {
+  if (hostRefusalShown) return
+  hostRefusalShown = true
+  window.alert(message)
+}
 
 const postJson = async (url, body) =>
   (await fetch(url, {
@@ -250,3 +274,5 @@ const status = ref('idle')
 const error = ref('')
 
 let loadedOnce = false
+
+let hostRefusalShown = false

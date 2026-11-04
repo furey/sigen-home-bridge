@@ -1,6 +1,26 @@
-import { rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
+
+const fsFault = vi.hoisted(() => ({ cutNextWrite: false, fsyncs: 0 }))
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal()
+  const cutShort = (write) => (target, data, ...rest) => {
+    if (!fsFault.cutNextWrite) return write(target, data, ...rest)
+    fsFault.cutNextWrite = false
+    write(target, String(data).slice(0, 12))
+    throw new Error('simulated power cut')
+  }
+  const writeFileSync = cutShort(actual.writeFileSync)
+  const writeSync = cutShort(actual.writeSync)
+  const fsyncSync = (fd) => {
+    fsFault.fsyncs += 1
+    return actual.fsyncSync(fd)
+  }
+  const overrides = { writeFileSync, writeSync, fsyncSync }
+  return { ...actual, ...overrides, default: { ...actual, ...overrides } }
+})
 
 const dataDir = fileURLToPath(new URL('../../tmp/test-data', import.meta.url))
 
@@ -9,8 +29,9 @@ process.env.POLL_INTERVAL_MS = '60000'
 process.env.RECONNECT_DELAY_MS = '10000'
 process.env.POLL_SCHEDULE = '08:00-12:00@5000'
 
-const { loadSettings, updateSettings, updateSecurity, publicSettings, resetSettings } =
-  await import('../settings.js')
+const {
+  loadSettings, getSettings, updateSettings, updateSecurity, publicSettings, resetSettings, onSettingsChange
+} = await import('../settings.js')
 
 beforeAll(() => rmSync(dataDir, { recursive: true, force: true }))
 
@@ -706,5 +727,171 @@ describe('secret redaction when locked', () => {
     expect(open.sigen.host).toBe('10.0.0.9')
     expect(open.alerts.items[0].channels.webhook.url).toBe('https://ntfy.sh/secret')
     updateSecurity({ passcode: null })
+  })
+})
+
+describe('settings file integrity', () => {
+  const settingsPath = `${dataDir}/settings.json`
+  const backups = () => readdirSync(dataDir).filter((name) => name.startsWith('settings.json.invalid-'))
+  const clearBackups = () => backups().forEach((name) => rmSync(`${dataDir}/${name}`))
+
+  it('keeps memory and the previous file intact when a write is cut short', () => {
+    updateSettings({ battery: { reserveSoc: 10 } })
+    const changes = []
+    const stop = onSettingsChange((changed) => changes.push(changed))
+    fsFault.cutNextWrite = true
+    expect(() => updateSettings({ battery: { reserveSoc: 20 } })).toThrow(/power cut/)
+    stop()
+    expect(getSettings().battery.reserveSoc).toBe(10)
+    expect(changes).toEqual([])
+    expect(loadSettings().battery.reserveSoc).toBe(10)
+  })
+
+  it('backs up an unparseable file before falling back to defaults', () => {
+    clearBackups()
+    writeFileSync(settingsPath, '{"setupComplete": tr')
+    expect(loadSettings().setupComplete).toBe(false)
+    expect(backups()).toHaveLength(1)
+    expect(readFileSync(`${dataDir}/${backups()[0]}`, 'utf8')).toBe('{"setupComplete": tr')
+  })
+
+  it('salvages every valid section when one section fails validation', () => {
+    clearBackups()
+    writeFileSync(settingsPath, JSON.stringify({
+      setupComplete: true,
+      battery: { reserveSoc: 30 },
+      history: { retentionDays: 500 },
+      security: { passcode: { hash: 'abcd1234', salt: 'beef' } }
+    }))
+    const settings = loadSettings()
+    expect(settings.setupComplete).toBe(true)
+    expect(settings.security.passcode).toEqual({ hash: 'abcd1234', salt: 'beef' })
+    expect(settings.battery.reserveSoc).toBe(30)
+    expect(settings.history.retentionDays).toBe(7)
+    expect(backups()).toHaveLength(1)
+    expect(existsSync(settingsPath)).toBe(true)
+    updateSecurity({ passcode: null })
+  })
+
+  it('falls back to built-in defaults for an invalid env-seeded section', async () => {
+    const seededDir = `${dataDir}-env-seed`
+    rmSync(seededDir, { recursive: true, force: true })
+    const saved = { ...process.env }
+    Object.assign(process.env, {
+      DATA_DIR: seededDir, HISTORY_RETENTION_DAYS: '120', SIGEN_PORT: '0', SIGEN_IP: '10.1.2.3'
+    })
+    vi.resetModules()
+    try {
+      const fresh = await import('../settings.js')
+      const settings = fresh.loadSettings()
+      expect(settings.history.retentionDays).toBe(7)
+      expect(settings.sigen.port).toBe(502)
+      expect(settings.sigen.host).toBe('10.1.2.3')
+      expect(settings.poll.defaultIntervalMs).toBe(60000)
+    } finally {
+      process.env = saved
+      vi.resetModules()
+    }
+  })
+})
+
+describe('settings salvage edge cases', () => {
+  const settingsPath = `${dataDir}/settings.json`
+  const backups = () => readdirSync(dataDir).filter((name) => name.startsWith('settings.json.invalid-'))
+  const clearBackups = () => backups().forEach((name) => rmSync(`${dataDir}/${name}`))
+  const passcode = { hash: 'abcd1234', salt: 'beef' }
+
+  it('survives a malformed alerts shape during migration', () => {
+    writeFileSync(settingsPath, JSON.stringify({ alerts: { items: 'oops' }, security: { passcode } }))
+    expect(() => loadSettings()).not.toThrow()
+    expect(getSettings().alerts.items).toEqual([])
+    expect(getSettings().security.passcode).toEqual(passcode)
+    writeFileSync(settingsPath, JSON.stringify({ alerts: { items: 'oops', transports: {} } }))
+    expect(() => loadSettings()).not.toThrow()
+    updateSecurity({ passcode: null })
+  })
+
+  it('keeps stored weather units when another weather field is invalid', () => {
+    writeFileSync(settingsPath, JSON.stringify({
+      weather: { units: 'fahrenheit', latitude: 999 },
+      alerts: { items: [{ id: 'hot', name: 'Hot', trigger: { type: 'outdoorTempAbove', threshold: 95 } }] }
+    }))
+    const settings = loadSettings()
+    expect(settings.weather.units).toBe('fahrenheit')
+    expect(settings.weather.latitude).toBeNull()
+    expect(settings.alerts.items.map((item) => item.trigger.threshold)).toEqual([95])
+  })
+
+  it('saves the salvaged settings so the next boot makes no new backup', () => {
+    clearBackups()
+    writeFileSync(settingsPath, JSON.stringify({ history: { retentionDays: 500 }, battery: { reserveSoc: 40 } }))
+    loadSettings()
+    loadSettings()
+    expect(backups()).toHaveLength(1)
+    expect(loadSettings().battery.reserveSoc).toBe(40)
+  })
+
+  it('flushes the temporary file to disk before renaming it into place', () => {
+    const before = fsFault.fsyncs
+    updateSettings({ battery: { reserveSoc: 5 } })
+    expect(fsFault.fsyncs).toBeGreaterThan(before)
+  })
+
+  it('keeps the valid entries of a list when one entry is invalid', () => {
+    writeFileSync(settingsPath, JSON.stringify({
+      alerts: {
+        items: [
+          { id: 'keep', name: 'Keep', trigger: { type: 'batteryBelow', threshold: 20 } },
+          { id: 'drop', name: 'Drop', trigger: { type: 'nope' } }
+        ]
+      },
+      tariff: {
+        importWindows: [{ start: '07:00', end: '09:00', rate: 0.3 }, { start: 'bad', end: '10:00', rate: 0.2 }]
+      },
+      poll: { schedule: [{ start: '06:00', end: '07:00', intervalMs: 5000 }, { start: '7am', end: '08:00' }] },
+      smartLoads: { labels: { 1: 'Pool', 99: 'Nowhere' } }
+    }))
+    const settings = loadSettings()
+    expect(settings.alerts.items.map((item) => item.id)).toEqual(['keep'])
+    expect(settings.tariff.importWindows).toEqual([{ start: '07:00', end: '09:00', rate: 0.3 }])
+    expect(settings.poll.schedule).toEqual([{ start: '06:00', end: '07:00', intervalMs: 5000 }])
+    expect(settings.smartLoads.labels).toEqual({ 1: 'Pool' })
+  })
+
+  it('leaves a valid file alone when only an env seed is invalid', async () => {
+    const seededDir = `${dataDir}-env-only`
+    rmSync(seededDir, { recursive: true, force: true })
+    mkdirSync(seededDir, { recursive: true })
+    const stored = JSON.stringify({ setupComplete: true, battery: { reserveSoc: 12 } })
+    writeFileSync(`${seededDir}/settings.json`, stored)
+    const saved = { ...process.env }
+    Object.assign(process.env, { DATA_DIR: seededDir, SIGEN_PORT: '0' })
+    vi.resetModules()
+    try {
+      const fresh = await import('../settings.js')
+      expect(fresh.loadSettings().sigen.port).toBe(502)
+      expect(readdirSync(seededDir).filter((name) => name.includes('.invalid-'))).toEqual([])
+      expect(readFileSync(`${seededDir}/settings.json`, 'utf8')).toBe(stored)
+    } finally {
+      process.env = saved
+      vi.resetModules()
+    }
+  })
+})
+
+describe('settings reset and history', () => {
+  it('keeps the history retention across a reset so no stored history is pruned', () => {
+    updateSettings({ setupComplete: true, history: { retentionDays: 30 } })
+    const changes = []
+    const stop = onSettingsChange((changed) => changes.push(...changed))
+    const after = resetSettings()
+    stop()
+    expect(after.setupComplete).toBe(false)
+    expect(after.history.retentionDays).toBe(30)
+    expect(changes).not.toContain('history')
+    const reloaded = loadSettings()
+    expect(reloaded.history.retentionDays).toBe(30)
+    expect(reloaded.setupComplete).toBe(false)
+    expect(reloaded.poll.defaultIntervalMs).toBe(60000)
   })
 })

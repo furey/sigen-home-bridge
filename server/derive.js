@@ -59,7 +59,8 @@ export const socPercent = (soc) => {
   return Math.min(99, Math.max(1, Math.round(value)))
 }
 
-export const batteryEstimate = (samples, { capacityKwh = null, reserveSoc = 0 } = {}) => {
+export const batteryEstimate = (allSamples, { capacityKwh = null, reserveSoc = 0 } = {}) => {
+  const samples = allSamples.filter(hasFiniteReadings)
   if (!samples.length) return IDLE
   const charging = currentDirection(samples)
   if (charging == null) return IDLE
@@ -76,6 +77,7 @@ const accumulate = (samples, tariff) => {
     const current = samples[index]
     const elapsedMs = current.t - previous.t
     if (elapsedMs <= 0 || elapsedMs > MAX_GAP_MS) continue
+    if (!Number.isFinite(previous.gridPower) || !Number.isFinite(current.gridPower)) continue
     const hours = elapsedMs / MS_PER_HOUR
     const watts = (previous.gridPower + current.gridPower) / 2
     if (Math.abs(watts) < GRID_DEADBAND_WATTS) continue
@@ -121,6 +123,7 @@ const readyEstimate = (streak, { charging, capacityKwh, reserveSoc }) => {
   const remainingPercent = charging ? 100 - latest.batterySoc : latest.batterySoc - reserveSoc
   if (remainingPercent <= 0) return null
   const minutesRemaining = roundedMinutes(remainingPercent / rate)
+  if (!Number.isFinite(minutesRemaining)) return null
   if (minutesRemaining <= 0 || minutesRemaining > MAX_HOURS * 60) return null
   return {
     status: 'ready',
@@ -131,6 +134,9 @@ const readyEstimate = (streak, { charging, capacityKwh, reserveSoc }) => {
     energyToGoKwh: capacityKwh ? (capacityKwh * remainingPercent) / 100 : null
   }
 }
+
+const hasFiniteReadings = ({ t, batteryPower, batterySoc }) =>
+  Number.isFinite(t) && Number.isFinite(batteryPower) && Number.isFinite(batterySoc)
 
 const warmEnough = ({ samples, span, travel }, capacityKwh) =>
   samples.length >= MIN_SAMPLES && span >= MIN_SPAN_MS && (capacityKwh ? true : travel >= MIN_SOC_TRAVEL)

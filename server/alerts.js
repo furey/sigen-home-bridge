@@ -34,6 +34,14 @@ export const stepRule = ({ prev, bad, armMs, clearMs, now }) => {
 }
 
 const tick = () => {
+  try {
+    evaluateAll()
+  } catch (error) {
+    log(`tick failed: ${error.message}`)
+  }
+}
+
+const evaluateAll = () => {
   const settings = getSettings()
   const now = Date.now()
   const ctx = buildContext(settings, now)

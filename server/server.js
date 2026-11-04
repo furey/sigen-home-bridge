@@ -17,11 +17,21 @@ import {
   requirePasscode, requireGoogleToken, isAuthenticated,
   unlock, lock, sessionStatus, setPasscode, clearPasscode
 } from './security.js'
+import { authorise, exchangeToken, warnIfPublicGoogleToken } from './oauth.js'
+import { requireAllowedHost, requireSameSiteJson } from './hosts.js'
 
 const uiDist = fileURLToPath(new URL('../ui/dist', import.meta.url))
 
 export const startHttpServer = () => {
+  const { port } = getSettings().server
+  warnIfPublicGoogleToken()
+  return createApp().listen(port, () => console.log(`[http] listening on ${port}`))
+}
+
+export const createApp = () => {
   const app = express()
+  app.use(['/api', '/events'], requireAllowedHost)
+  app.use('/api', requireSameSiteJson)
   app.use(express.json())
   app.get('/events', streamEvents)
   app.get('/api/state', (request, response) => response.json(state))
@@ -47,12 +57,11 @@ export const startHttpServer = () => {
   app.post('/api/test/alert', requirePasscode, testAlertHandler)
   app.get('/api/homekit/pairing', requirePasscode, (request, response) => response.json(getPairing()))
   app.post('/fulfillment', requireGoogleToken, (request, response) => response.json(handleIntent(request.body)))
-  app.get('/auth', stubAuth)
-  app.post('/token', stubToken)
+  app.get('/auth', authorise)
+  app.post('/token', express.urlencoded({ extended: false }), exchangeToken)
   app.use(express.static(uiDist, { setHeaders: setStaticCacheHeaders }))
   app.use(spaFallback)
-  const { port } = getSettings().server
-  return app.listen(port, () => console.log(`[http] listening on ${port}`))
+  return app
 }
 
 const sendJson = (request, response, payload) =>
@@ -153,21 +162,6 @@ const testAlertHandler = async (request, response) => {
   response.json(await testAlert({ url, id, name, trigger }))
 }
 
-const stubAuth = (request, response) => {
-  const { redirect_uri, state: oauthState } = request.query
-  response.redirect(`${redirect_uri}?code=sigen&state=${oauthState ?? ''}`)
-}
-
-const stubToken = (request, response) => {
-  const { authToken } = getSettings().google
-  response.json({
-    token_type: 'Bearer',
-    access_token: authToken,
-    refresh_token: authToken,
-    expires_in: SECONDS_PER_YEAR
-  })
-}
-
 const spaFallback = (request, response, next) => {
   if (request.method !== 'GET') return next()
   response.setHeader('Cache-Control', 'no-store')
@@ -175,5 +169,3 @@ const spaFallback = (request, response, next) => {
 }
 
 const HEARTBEAT_MS = 15000
-
-const SECONDS_PER_YEAR = 31536000

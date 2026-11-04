@@ -113,6 +113,10 @@ describe('history CSV', () => {
 })
 
 describe('history stats', () => {
+  it('reports the sample ceiling so the UI can state the effective retention', () => {
+    expect(historyStats().maxSamples).toBe(MAX_SAMPLES)
+  })
+
   it('reports the count and time span of the retained samples', () => {
     const stats = historyStats()
     expect(stats.count).toBe(getHistoryAll().length)

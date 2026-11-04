@@ -1,18 +1,20 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  closeSync, copyFileSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, writeSync
+} from 'node:fs'
 import { dirname } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { config, GOOGLE_METRICS, HOMEKIT_METRICS } from './config.js'
-import { getTrigger, serializeTriggers } from './triggers.js'
+import { config, CONFIG_DEFAULTS, GOOGLE_METRICS, HOMEKIT_METRICS } from './config.js'
+import { convertTriggerUnits, getTrigger, serializeTriggers } from './triggers.js'
 import { tariffConfigured } from './derive.js'
 import { state } from './state.js'
 
 export const loadSettings = () => {
-  try {
-    current = merge(readStored())
-  } catch (error) {
-    console.log(`[settings] ignoring invalid stored settings: ${error.message}`)
-    current = merge(null)
-  }
+  const stored = readStored()
+  if (stored.error) backUpStored({ problem: `could not be parsed (${stored.error})`, move: true })
+  const { settings, reset } = salvage(seed(stored.value))
+  if (reset.length) reportReset(reset)
+  if (reset.some(({ origin }) => origin === 'stored')) keepSalvaged(settings)
+  current = settings
   return current
 }
 
@@ -48,28 +50,29 @@ const redactWebhookUrl = (item) => ({
 })
 
 const triggerCapabilities = () => ({
+  units: getSettings().weather.units,
   weatherEnabled: getSettings().weather.enabled,
   tariffConfigured: tariffConfigured(getSettings().tariff),
   batterySohPresent: state.batterySoh != null
 })
 
 export const updateSettings = (patch) => {
-  current = validate(mergeSections(getSettings(), patch))
-  persist(current)
-  notify(changedSections(patch))
+  const base = withTemperatureUnits(getSettings(), patch?.weather?.units)
+  commit(validate(mergeSections(base, patch)))
+  notify(changedSections(patch, base !== getSettings()))
   return current
 }
 
 export const updateSecurity = (security) => {
-  current = validate({ ...getSettings(), security })
-  persist(current)
+  commit(validate({ ...getSettings(), security }))
   return current.security
 }
 
 export const resetSettings = () => {
-  rmSync(config.paths.settings, { force: true })
-  current = merge(null)
-  notify(SECTIONS)
+  const kept = { setupComplete: false, history: getSettings().history }
+  persist(kept)
+  current = merge(kept)
+  notify(SECTIONS.filter((section) => !RESET_KEEPS.includes(section)))
   return current
 }
 
@@ -82,6 +85,20 @@ const SECTIONS = [
   'sigen', 'poll', 'weather', 'battery', 'tariff', 'history', 'smartLoads', 'solar',
   'alerts', 'homekit', 'server', 'google', 'appearance', 'security'
 ]
+
+const RESET_KEEPS = ['history']
+
+const commit = (next) => {
+  persist(next)
+  current = next
+}
+
+const withTemperatureUnits = (settings, units) => {
+  const from = settings.weather.units
+  if (!units || units === from) return settings
+  const convert = (item) => ({ ...item, trigger: convertTriggerUnits({ trigger: item.trigger, from, to: units }) })
+  return { ...settings, alerts: { ...settings.alerts, items: settings.alerts.items.map(convert) } }
+}
 
 const defaults = () => ({
   setupComplete: false,
@@ -152,17 +169,125 @@ const defaultAppearance = () => ({
   }
 })
 
-const merge = (stored) =>
-  validate({
-    ...mergeSections(defaults(), migrate(stored)),
-    setupComplete: stored?.setupComplete ?? Boolean(stored)
+const merge = (stored) => salvage(seed(stored)).settings
+
+const seed = (stored) => ({
+  ...mergeSections(defaults(), migrate(stored)),
+  setupComplete: stored?.setupComplete ?? Boolean(stored)
+})
+
+const salvage = (merged) => {
+  const reset = []
+  const settings = SECTIONS.reduce((valid, section) => {
+    try {
+      return { ...valid, [section]: SECTION_VALIDATORS[section](merged[section], valid) }
+    } catch {
+      const repaired = repairSection({ section, merged, valid })
+      reset.push(...repaired.rejected)
+      return { ...valid, [section]: repaired.value }
+    }
+  }, { setupComplete: Boolean(merged.setupComplete) })
+  return { settings, reset }
+}
+
+const repairSection = ({ section, merged, valid }) => {
+  const validator = (raw) => SECTION_VALIDATORS[section](raw, valid)
+  const seeded = defaults()[section]
+  const fromEnv = layerFields({ base: builtInDefaults()[section], candidate: seeded, validator })
+  const fromStored = layerFields({
+    base: fromEnv.raw, candidate: fieldsDifferingFrom(merged[section], seeded), validator
   })
+  const tag = (origin) => (entry) => ({ ...entry, section, origin })
+  return {
+    value: validator(fromStored.raw),
+    rejected: [...fromEnv.rejected.map(tag('environment-seeded')), ...fromStored.rejected.map(tag('stored'))]
+  }
+}
+
+const layerFields = ({ base, candidate, validator }) => {
+  const rejected = []
+  const raw = Object.entries(candidate).reduce(
+    (accepted, [field, value]) => layerField({ accepted, field, value, validator, rejected }), base)
+  return { raw, rejected }
+}
+
+const layerField = ({ accepted, field, value, validator, rejected }) => {
+  const attempt = { ...accepted, [field]: value }
+  const failure = validationError(validator, attempt)
+  if (!failure) return attempt
+  if (Array.isArray(value) || isPlainObject(value)) {
+    return layerParts({ accepted, field, value, validator, rejected })
+  }
+  rejected.push({ field, reason: failure.message })
+  return accepted
+}
+
+const layerParts = ({ accepted, field, value, validator, rejected }) => {
+  const isList = Array.isArray(value)
+  const start = isList ? [] : isPlainObject(accepted[field]) ? accepted[field] : {}
+  const add = (parts, key, part) => (isList ? [...parts, part] : { ...parts, [key]: part })
+  const kept = Object.entries(value).reduce((parts, [key, part]) => {
+    const next = add(parts, key, part)
+    const failure = validationError(validator, { ...accepted, [field]: next })
+    if (!failure) return next
+    rejected.push({ field: `${field}[${key}]`, reason: failure.message })
+    return parts
+  }, start)
+  const result = { ...accepted, [field]: kept }
+  return validationError(validator, result) ? accepted : result
+}
+
+const validationError = (validator, raw) => {
+  try {
+    validator(raw)
+    return null
+  } catch (error) {
+    return error
+  }
+}
+
+const fieldsDifferingFrom = (section, seeded) =>
+  isPlainObject(section)
+    ? Object.fromEntries(Object.entries(section).filter(([field, value]) => value !== seeded?.[field]))
+    : {}
+
+const reportReset = (reset) => {
+  for (const { origin, section, field, reason } of reset) {
+    console.log(`[settings] ${origin} ${section}.${field} is invalid (${reason}); using the default`)
+  }
+  const fromFile = reset.filter(({ origin }) => origin === 'stored')
+  if (fromFile.length) backUpStored({ problem: `had invalid fields (${fromFile.map(fieldPath).join(', ')})` })
+}
+
+const fieldPath = ({ section, field }) => `${section}.${field}`
+
+const keepSalvaged = (settings) => {
+  try {
+    persist(settings)
+  } catch (error) {
+    console.log(`[settings] could not save the repaired settings: ${error.message}`)
+  }
+}
+
+const builtInDefaults = () => {
+  const seeded = defaults()
+  return Object.fromEntries(SECTIONS.map((section) =>
+    [section, { ...seeded[section], ...CONFIG_DEFAULTS[section] }]))
+}
 
 const migrate = (stored) => {
+  try {
+    return migrateAlerts(stored)
+  } catch {
+    return stored
+  }
+}
+
+const migrateAlerts = (stored) => {
   const alerts = stored?.alerts
   if (!alerts) return stored
   if (alerts.rules && !alerts.items) return { ...stored, alerts: fromLegacyRules(alerts) }
-  if (alerts.items && (alerts.transports || alerts.items.some(hasFlatChannels))) {
+  if (Array.isArray(alerts.items) && (alerts.transports || alerts.items.some(hasFlatChannels))) {
     return { ...stored, alerts: fromSharedTransports(alerts) }
   }
   return stored
@@ -287,23 +412,9 @@ const mergeStringNames = (base = {}, patch) => {
 const isPlainObject = (value) =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
-const validate = (settings) => ({
-  setupComplete: Boolean(settings.setupComplete),
-  sigen: validSigen(settings.sigen),
-  poll: validatePoll(settings.poll),
-  weather: validWeather(settings.weather),
-  battery: validBattery(settings.battery),
-  tariff: validTariff(settings.tariff),
-  history: validHistory(settings.history),
-  smartLoads: validSmartLoads(settings.smartLoads),
-  solar: validSolar(settings.solar),
-  alerts: validAlerts(settings.alerts),
-  homekit: validHomekit(settings.homekit),
-  server: validServer(settings.server),
-  google: validGoogle(settings.google),
-  appearance: validAppearance(settings.appearance),
-  security: validSecurity(settings.security)
-})
+const validate = (settings) => SECTIONS.reduce(
+  (valid, section) => ({ ...valid, [section]: SECTION_VALIDATORS[section](settings[section], valid) }),
+  { setupComplete: Boolean(settings.setupComplete) })
 
 const validSecurity = ({ passcode } = {}) => ({ passcode: validStoredPasscode(passcode) })
 
@@ -403,17 +514,17 @@ const validStringGroup = (group, key) => {
   return Object.fromEntries(entries.filter(([, name]) => name))
 }
 
-const validAlerts = ({ items }) => ({ items: validAlertItems(items) })
+const validAlerts = ({ items }, units) => ({ items: validAlertItems(items, units) })
 
-const validAlertItems = (items) => {
+const validAlertItems = (items, units) => {
   if (items === undefined || items === null) return []
   if (!Array.isArray(items)) throw badRequest('alerts must be an array')
   if (items.length > MAX_ALERTS) throw badRequest(`at most ${MAX_ALERTS} alerts are allowed`)
-  return items.map(validAlertItem)
+  return items.map((item) => validAlertItem(item, units))
 }
 
-const validAlertItem = (item) => {
-  const trigger = getTrigger(item?.trigger?.type)
+const validAlertItem = (item, units) => {
+  const trigger = getTrigger(item?.trigger?.type, { units })
   if (!trigger) throw badRequest(`unknown alert trigger: ${item?.trigger?.type}`)
   const name = validText(item?.name, trigger.label, 'alert name')
   return {
@@ -737,26 +848,69 @@ const isClock = (value) => {
   return Number(match[1]) < 24 && Number(match[2]) < 60
 }
 
-const changedSections = (patch) => SECTIONS.filter((section) => patch?.[section] !== undefined)
+const changedSections = (patch, alertsConverted) =>
+  SECTIONS.filter((section) => patch?.[section] !== undefined || (section === 'alerts' && alertsConverted))
 
 const notify = (changed) => {
   for (const listener of listeners) listener(changed)
 }
 
 const readStored = () => {
+  if (!existsSync(config.paths.settings)) return { value: null }
   try {
-    return JSON.parse(readFileSync(config.paths.settings, 'utf8'))
-  } catch {
-    return null
+    const parsed = JSON.parse(readFileSync(config.paths.settings, 'utf8'))
+    return isPlainObject(parsed) ? { value: parsed } : { value: null, error: 'not a JSON object' }
+  } catch (error) {
+    return { value: null, error: error.message }
+  }
+}
+
+const backUpStored = ({ problem, move = false }) => {
+  const backup = `${config.paths.settings}.invalid-${new Date().toISOString().replace(/[:.]/g, '-')}`
+  try {
+    if (move) renameSync(config.paths.settings, backup)
+    else copyFileSync(config.paths.settings, backup)
+    console.log(`[settings] settings.json ${problem}; saved a copy to ${backup}`)
+  } catch (error) {
+    console.log(`[settings] settings.json ${problem}; could not save a copy: ${error.message}`)
   }
 }
 
 const persist = (settings) => {
+  const temporary = `${config.paths.settings}.tmp`
   mkdirSync(dirname(config.paths.settings), { recursive: true })
-  writeFileSync(config.paths.settings, `${JSON.stringify(settings, null, 2)}\n`)
+  writeDurably(temporary, `${JSON.stringify(settings, null, 2)}\n`)
+  renameSync(temporary, config.paths.settings)
+}
+
+const writeDurably = (path, text) => {
+  const descriptor = openSync(path, 'w')
+  try {
+    writeSync(descriptor, text)
+    fsyncSync(descriptor)
+  } finally {
+    closeSync(descriptor)
+  }
 }
 
 const badRequest = (message) => Object.assign(new Error(message), { status: 400 })
+
+const SECTION_VALIDATORS = {
+  sigen: validSigen,
+  poll: validatePoll,
+  weather: validWeather,
+  battery: validBattery,
+  tariff: validTariff,
+  history: validHistory,
+  smartLoads: validSmartLoads,
+  solar: validSolar,
+  alerts: (alerts, valid) => validAlerts(alerts, valid.weather?.units),
+  homekit: validHomekit,
+  server: validServer,
+  google: validGoogle,
+  appearance: validAppearance,
+  security: validSecurity
+}
 
 const MIN_INTERVAL_MS = 1000
 

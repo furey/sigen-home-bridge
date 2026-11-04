@@ -108,6 +108,13 @@ describe('dailyCost', () => {
     expect(cost.net).toBeCloseTo(0.15 + 0.3 - 0.286 - 2.65)
   })
 
+  it('skips intervals that touch a missing grid reading', () => {
+    const samples = segment(16, 17, -3000).map((sample) =>
+      (sample.t === at(16, 30) ? { ...sample, gridPower: null } : sample))
+    const cost = dailyCost({ samples, tariff: GLOBIRD, now: new Date(at(19)) })
+    expect(cost.feedIn).toBeCloseTo(0.125)
+  })
+
   it('awards the zero-draw credit when no import lands in its window', () => {
     const cost = dailyCost({ samples: segment(16, 16.5, 1000), tariff: GLOBIRD, now: new Date(at(17)) })
     expect(cost.zeroDrawMet).toBe(true)
@@ -181,5 +188,23 @@ describe('batteryEstimate', () => {
       { capacityKwh: 10 }
     )
     expect(stepped.minutesRemaining).toBeLessThan(flat.minutesRemaining)
+  })
+
+  it('ignores a non-finite power sample instead of throwing', () => {
+    const estimate = batteryEstimate(
+      chargeRun({ soc: 50, watts: (index) => (index === 15 ? NaN : 3000) }),
+      { capacityKwh: 10 }
+    )
+    expect(estimate.status).toBe('ready')
+    expect(estimate.minutesRemaining).toBe(100)
+  })
+
+  it('ignores missing power samples left by a skipped register read', () => {
+    const estimate = batteryEstimate(
+      chargeRun({ soc: 50, watts: (index) => (index % 4 === 0 ? null : 3000) }),
+      { capacityKwh: 10 }
+    )
+    expect(estimate.status).toBe('ready')
+    expect(estimate.minutesRemaining).toBe(100)
   })
 })
