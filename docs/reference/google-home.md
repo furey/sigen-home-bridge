@@ -1,6 +1,6 @@
 ---
 title: Google Home fulfillment
-description: The SYNC/QUERY/EXECUTE/DISCONNECT intents as plain Express handlers, the two-trait device mapping, the stub OAuth, and the display trade-offs.
+description: The SYNC/QUERY/EXECUTE/DISCONNECT intents as plain Express handlers, the two-trait device mapping, the minimal OAuth, the connection status, and the display trade-offs.
 ---
 
 # Google Home fulfillment
@@ -14,7 +14,7 @@ sequenceDiagram
   participant B as Bridge (Express)
   G->>T: OAuth /auth then /token
   T->>B: forward
-  B-->>G: static bearer (stub)
+  B-->>G: static bearer (client secret checked)
   G->>T: POST /fulfillment · SYNC
   T->>B: forward
   B-->>G: battery + four power devices
@@ -24,6 +24,8 @@ sequenceDiagram
 ```
 
 The bridge ships a minimal OAuth for personal use that hands Google a static bearer: the Auth token in Settings → Google Home (seeded from `GOOGLE_AUTH_TOKEN`). `/auth` redirects only to Google's account-linking addresses (`https://oauth-redirect.googleusercontent.com/r/…` and its sandbox twin), with a random one-time code that expires after 10 minutes. `/token` first checks that the client secret, sent in the form body or as HTTP Basic auth, equals the auth token. It then trades a valid code (once) or a refresh token equal to the auth token for the bearer. The Client ID is not checked.
+
+The bridge keeps the time and outcome of the last accepted and last rejected Google request in memory (`server/google-status.js`), never the token or the caller's address. Only a `/fulfillment` call with the right bearer or a `/token` call with the right client secret counts as accepted. Settings → Google Home shows it beside **Check Google connection**, and it resets when the bridge restarts.
 
 ## Two traits for the readings
 

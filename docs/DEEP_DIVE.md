@@ -502,6 +502,7 @@ sigen-home-bridge/
 │   ├── security.js     optional settings passcode: scrypt hash, session tokens, lockout
 │   ├── oauth.js        Google account-linking OAuth: /auth one-time codes, /token checks
 │   ├── hosts.js        Host allow-list and same-origin JSON check for /api and /events
+│   ├── google-status.js Last accepted and rejected Google request, in memory
 │   ├── weather.js      outdoor temperature from Open-Meteo
 │   ├── state.js        shared in-memory state and pub/sub
 │   ├── history.js      reading history in SQLite (write-through), retention + CSV/JSON export
