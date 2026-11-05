@@ -1,3 +1,8 @@
+import {
+  closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, writeSync
+} from 'node:fs'
+import { resolve } from 'node:path'
+import { config } from './config.js'
 import { getSettings } from './settings.js'
 import { state, publish } from './state.js'
 import { getHistoryAll } from './history.js'
@@ -5,6 +10,7 @@ import { batteryEstimate, netPerHour, socPercent, tariffConfigured } from './der
 import { getTrigger } from './triggers.js'
 
 export const startAlerts = () => {
+  restoreRuntime(getSettings().alerts.items)
   tick()
   setInterval(tick, TICK_MS)
 }
@@ -56,6 +62,7 @@ const evaluateAll = () => {
     if (edge) edges.push({ item, edge, at: now })
   }
   prune(present)
+  saveRuntimeIfChanged()
   const active = activeAlerts(settings.alerts.items, ctx)
   activeIds = new Set(active.map((alert) => alert.id))
   state.alerts = active
@@ -67,7 +74,7 @@ const evaluate = ({ item, trigger, enabled, ctx, now }) => {
   const prev = runtime.get(item.id) ?? IDLE
   if (!enabled) {
     runtime.set(item.id, IDLE)
-    return prev.active ? 'cleared' : null
+    return null
   }
   const bad = trigger.isBad({ ctx, params: item.trigger, active: prev.active })
   const { next, edge } = stepRule({
@@ -77,7 +84,7 @@ const evaluate = ({ item, trigger, enabled, ctx, now }) => {
     clearMs: trigger.clearMs(item.trigger),
     now
   })
-  runtime.set(item.id, next)
+  runtime.set(item.id, { ...next, type: item.trigger.type })
   return edge
 }
 
@@ -104,9 +111,13 @@ const buildContext = (settings, now) => {
     loadPower: state.loadPower,
     outdoorTemp: settings.weather.enabled ? state.outdoorTemp : null,
     costPerHour: configured
-      ? -netPerHour({ tariff: settings.tariff, gridWatts: state.gridPower ?? 0, now: new Date(now) })
+      ? -netPerHour({
+        tariff: settings.tariff, gridWatts: state.gridPower ?? 0, now: new Date(now)
+      })
       : null,
-    estimate: batteryEstimate(getHistoryAll(), { capacityKwh, reserveSoc: settings.battery.reserveSoc })
+    estimate: batteryEstimate(getHistoryAll(), {
+      capacityKwh, reserveSoc: settings.battery.reserveSoc
+    })
   }
 }
 
@@ -151,6 +162,82 @@ const prune = (present) => {
   for (const id of runtime.keys()) if (!present.has(id)) runtime.delete(id)
 }
 
+const restoreRuntime = (items) => {
+  const types = new Map(items.map((item) => [item.id, item.trigger.type]))
+  const saved = readSavedRuntime()
+  const kept = Object.entries(saved).filter(([id, entry]) => types.get(id) === entry.type)
+  for (const [id, entry] of kept) runtime.set(id, { ...IDLE, ...entry })
+  savedText = kept.length === Object.keys(saved).length ? serializeRuntime() : null
+}
+
+const readSavedRuntime = () => {
+  if (!existsSync(statePath())) {
+    log('no alerts-state.json; starting with every alert idle')
+    return {}
+  }
+  try {
+    const parsed = JSON.parse(readFileSync(statePath(), 'utf8'))
+    if (isSavedRuntime(parsed)) return parsed
+    log('alerts-state.json is not a valid state map; starting with every alert idle')
+  } catch (error) {
+    log(`alerts-state.json unreadable (${error.message}); starting with every alert idle`)
+  }
+  return {}
+}
+
+const isSavedRuntime = (value) =>
+  value !== null && typeof value === 'object' && !Array.isArray(value) &&
+  Object.values(value).every(isSavedEntry)
+
+const isSavedEntry = (entry) =>
+  entry !== null && typeof entry === 'object' && entry.active === true &&
+  Number.isFinite(entry.since) && typeof entry.type === 'string'
+
+const saveRuntimeIfChanged = () => {
+  const text = serializeRuntime()
+  if (text === savedText) return
+  try {
+    persistRuntime(text)
+    savedText = text
+    lastSaveError = null
+  } catch (error) {
+    logSaveError(error.message)
+  }
+}
+
+const logSaveError = (message) => {
+  if (message === lastSaveError) return
+  lastSaveError = message
+  log(`could not save alerts-state.json: ${message}`)
+}
+
+const serializeRuntime = () => {
+  const entries = [...runtime].filter(([, entry]) => entry.active)
+  const saved = Object.fromEntries(entries.map(([id, entry]) => [id, savedEntry(entry)]))
+  return `${JSON.stringify(saved, null, 2)}\n`
+}
+
+const savedEntry = ({ since, type }) => ({ active: true, since, type })
+
+const persistRuntime = (text) => {
+  const temporary = `${statePath()}.tmp`
+  mkdirSync(config.paths.data, { recursive: true })
+  writeDurably(temporary, text)
+  renameSync(temporary, statePath())
+}
+
+const writeDurably = (path, text) => {
+  const descriptor = openSync(path, 'w')
+  try {
+    writeSync(descriptor, text)
+    fsyncSync(descriptor)
+  } finally {
+    closeSync(descriptor)
+  }
+}
+
+const statePath = () => resolve(config.paths.data, 'alerts-state.json')
+
 const samplePayload = ({ id, name, trigger }) => {
   const now = Date.now()
   const item = { id: id ?? 'test', name: name ?? 'Test alert', trigger: trigger ?? {} }
@@ -192,6 +279,10 @@ const log = (message) => console.log(`[alerts] ${message}`)
 const runtime = new Map()
 
 let activeIds = new Set()
+
+let savedText = null
+
+let lastSaveError = null
 
 const IDLE = { active: false, since: null, candidateAt: null }
 

@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { stepRule } from '../alerts.js'
 import { getTrigger, serializeTriggers } from '../triggers.js'
@@ -144,6 +147,8 @@ describe('trigger catalogue', () => {
 
 describe('startAlerts', () => {
   it('logs a failed tick instead of throwing', async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), 'sigen-alerts-start-'))
+    process.env.DATA_DIR = dataDir
     vi.resetModules()
     vi.doMock('../settings.js', () => ({
       getSettings: () => ({
@@ -166,7 +171,10 @@ describe('startAlerts', () => {
       expect(() => startAlerts()).not.toThrow()
       await vi.advanceTimersByTimeAsync(15000)
       expect(logged).toHaveBeenCalledWith('[alerts] tick failed: history unavailable')
+      const { config } = await import('../config.js')
+      expect(config.paths.data).toBe(dataDir)
     } finally {
+      rmSync(dataDir, { recursive: true, force: true })
       vi.useRealTimers()
       logged.mockRestore()
       vi.doUnmock('../settings.js')

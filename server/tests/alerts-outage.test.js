@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { stepRule } from '../alerts.js'
 import { getTrigger } from '../triggers.js'
@@ -67,9 +70,11 @@ describe('webhook retry', () => {
     vi.doUnmock('../settings.js')
     vi.doUnmock('../history.js')
     vi.restoreAllMocks()
+    rmSync(process.env.DATA_DIR, { recursive: true, force: true })
   })
 
   const raiseOnce = async (fetchMock) => {
+    process.env.DATA_DIR = mkdtempSync(join(tmpdir(), 'sigen-alerts-outage-'))
     vi.resetModules()
     vi.doMock('../settings.js', () => ({ getSettings: () => SETTINGS }))
     vi.doMock('../history.js', () => ({ getHistoryAll: () => [] }))
@@ -156,7 +161,7 @@ describe('held alerts with no signal', () => {
 })
 
 describe('stale weather reading', () => {
-  it('clears an active hot-weather alert after the clear delay once the reading is nulled', () => {
+  it('holds an active hot-weather alert past the clear delay while the reading is null', () => {
     const trigger = getTrigger('outdoorTempAbove')
     const params = { threshold: 35 }
     const ctx = { ...liveCtx, outdoorTemp: null }
@@ -168,8 +173,9 @@ describe('stale weather reading', () => {
       return result.edge
     }
     expect(step(1000)).toBeNull()
-    expect(step(1000 + trigger.clearMs(params) - 1)).toBeNull()
-    expect(step(1000 + trigger.clearMs(params))).toBe('cleared')
+    expect(step(1000 + trigger.clearMs(params))).toBeNull()
+    expect(step(1000 + trigger.clearMs(params) * 10)).toBeNull()
+    expect(prev.active).toBe(true)
   })
 })
 

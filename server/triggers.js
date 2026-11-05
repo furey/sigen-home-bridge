@@ -132,7 +132,7 @@ const threshold = ({
     params: [{ key: 'threshold', label: paramLabel, unit, min, max, step, default: fallback }],
     isBad: ({ ctx, params, active }) => {
       const value = current(ctx)
-      if (value == null) return gated ? null : false
+      if (value == null) return null
       const band = active ? hysteresis : 0
       return comparison === 'below' ? value <= params.threshold + band : value >= params.threshold - band
     },
