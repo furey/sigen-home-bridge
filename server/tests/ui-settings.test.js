@@ -19,3 +19,17 @@ describe('committing a session', () => {
     expect(error.value).toBe('Bridge unavailable')
   })
 })
+
+describe('reloading settings', () => {
+  it('exposes reload so a section can refresh server status', async () => {
+    const okResponse = {
+      ok: true, status: 200, json: async () => ({ googleStatus: { lastAccepted: null } })
+    }
+    vi.stubGlobal('fetch', vi.fn(async () => okResponse))
+    vi.stubGlobal('document', { title: '', documentElement: { style: { setProperty: () => {} } } })
+    const { reload } = useSettings()
+    expect(typeof reload).toBe('function')
+    const data = await reload()
+    expect(data.googleStatus).toEqual({ lastAccepted: null })
+  })
+})

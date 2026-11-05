@@ -152,7 +152,7 @@ export const useSettings = () => {
   }
 
   return {
-    data, status, error, load, loadOnce, save, applyPatch, reset,
+    data, status, error, load, loadOnce, reload, save, applyPatch, reset,
     testGateway, discoverGateway, testWeather, testAlert, fetchPairing, shouldRunSetup, dismiss, undismiss,
     unlock, verifySession, commitSession, lock, setPasscode, clearPasscode
   }
