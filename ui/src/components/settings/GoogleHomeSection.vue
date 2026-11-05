@@ -180,20 +180,20 @@ function buildPatch() {
       </span>
     </div>
     <div class="flex flex-wrap items-center gap-x-3 gap-y-2 mt-3">
-      <div class="space-y-0.5">
+      <button type="button"
+        class="flex shrink-0 items-center gap-1.5 rounded-xl bg-zinc-800 px-3 py-1.5 text-sm
+          hover:bg-zinc-700 disabled:opacity-50"
+        :disabled="refreshing" @click="refreshStatus">
+        <LoaderCircle v-if="refreshing" class="w-4 h-4 animate-spin" />
+        <RefreshCw v-else class="w-4 h-4" />{{ refreshing ? 'Checking…' : 'Check link' }}
+      </button>
+      <div class="min-w-0 flex-1 basis-56 space-y-0.5">
         <p v-for="line in statusLines" :key="line.text" class="text-sm text-pretty"
           :class="STATUS_TONES[line.tone]">
           {{ line.text }}
         </p>
+        <p v-if="refreshError" class="text-sm text-red-400 text-pretty">{{ refreshError }}</p>
       </div>
-      <button type="button"
-        class="flex items-center gap-1.5 rounded-xl bg-zinc-800 px-3 py-1.5 text-sm
-          hover:bg-zinc-700 disabled:opacity-50"
-        :disabled="refreshing" @click="refreshStatus">
-        <LoaderCircle v-if="refreshing" class="w-4 h-4 animate-spin" />
-        <RefreshCw v-else class="w-4 h-4" />{{ refreshing ? 'Refreshing…' : 'Refresh' }}
-      </button>
-      <span v-if="refreshError" class="text-sm text-red-400 text-balance">{{ refreshError }}</span>
     </div>
   </section>
 
