@@ -75,7 +75,7 @@ const settingsShots = [
   { kind: 'full', route: '/settings/solar', file: 'settings-solar.png', inject: true },
   { kind: 'full', route: '/settings/alerts', file: 'settings-alerts.png' },
   { kind: 'crop', route: '/settings/apple-home', file: 'settings-apple-home.png', prep: sanitizeApple },
-  { kind: 'crop', route: '/settings/google-home', file: 'settings-google-home.png' }
+  { kind: 'full', route: '/settings/google-home', file: 'settings-google-home.png', stub: connectedGoogle }
 ]
 
 const shotViewport = async (browser, { profile, path, file, view, prep, state, clip, settings }) => {
@@ -88,9 +88,10 @@ const shotViewport = async (browser, { profile, path, file, view, prep, state, c
   await context.close()
 }
 
-const shotSettingsFull = async (browser, { route, prep, file }, inject = {}) => {
+const shotSettingsFull = async (browser, { route, prep, file, stub }, inject = {}) => {
   const measuring = { viewport: { width: 1280, height: 2400 }, deviceScaleFactor: 2 }
-  const { context, page } = await newPage(browser, measuring, {}, inject.state, inject.settings)
+  const override = stub ? await stub() : null
+  const { context, page } = await newPage(browser, measuring, {}, inject.state, inject.settings, override)
   await open(page, route, 1800)
   if (prep) await prep(page)
   await wait(page, 500)
@@ -250,7 +251,13 @@ const stagedSettings = async () => {
   }
 }
 
-const newPage = async (browser, profile, view, state, settings) => {
+async function connectedGoogle () {
+  const real = await (await fetch(`${BASE}/api/settings`)).json()
+  const lastAccepted = { at: new Date(Date.now() - 2 * 60 * 1000).toISOString(), route: 'fulfillment' }
+  return { ...real, googleStatus: { lastAccepted, lastRejected: null } }
+}
+
+const newPage = async (browser, profile, view, state, settings, settingsOverride = null) => {
   const context = await browser.newContext({
     viewport: profile.viewport,
     deviceScaleFactor: profile.deviceScaleFactor,
@@ -265,6 +272,10 @@ const newPage = async (browser, profile, view, state, settings) => {
   if (state && settings) {
     await context.route('**/api/settings', (route) =>
       route.fulfill({ contentType: 'application/json', body: JSON.stringify(settings) }))
+  }
+  if (settingsOverride) {
+    await context.route('**/api/settings', (route) =>
+      route.fulfill({ contentType: 'application/json', body: JSON.stringify(settingsOverride) }))
   }
   await context.route('**/api/session', (route) => route.fulfill({
     status: 200,
