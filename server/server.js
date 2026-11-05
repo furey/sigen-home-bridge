@@ -18,7 +18,9 @@ import {
   requirePasscode, requireGoogleToken, isAuthenticated,
   unlock, lock, sessionStatus, setPasscode, clearPasscode
 } from './security.js'
-import { authorise, exchangeToken, warnIfPublicGoogleToken } from './oauth.js'
+import {
+  authorise, exchangeToken, rejectWeakGoogleToken, warnIfPublicGoogleToken
+} from './oauth.js'
 import { requireAllowedHost, requireSameSiteJson } from './hosts.js'
 
 const uiDist = fileURLToPath(new URL('../ui/dist', import.meta.url))
@@ -165,6 +167,7 @@ const backpressuredStream = (response, stallMs) => {
 
 const saveSettings = (request, response, next) => {
   try {
+    rejectWeakGoogleToken(request.body)
     updateSettings(request.body)
     response.json(publicSettings({ authenticated: true }))
   } catch (error) {

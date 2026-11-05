@@ -34,7 +34,10 @@ const restoring = ref(false)
 const confirmingRestore = ref(false)
 const pendingImport = ref(null)
 
-const DERIVED_KEYS = ['googleAuthTokenSet', 'homekitMetrics', 'googleMetrics', 'alertTriggers', 'security']
+const DERIVED_KEYS = [
+  'googleAuthTokenSet', 'googleStatus', 'homekitMetrics', 'googleMetrics', 'alertTriggers',
+  'security'
+]
 
 const { status, error, dirty, save, markPristine, pendingLeave, confirmLeave, cancelLeave } =
   useSettingsSection({ snapshot, buildPatch })

@@ -47,7 +47,7 @@ export const HELP = {
   googleToken: {
     title: 'Google auth token',
     body: [
-      { p: 'A static bearer string used by the stub OAuth for Google Smart Home fulfillment. Make up any value; it’s personal-use only and travels over your Cloudflare tunnel.' },
+      { p: 'A static bearer string used by the stub OAuth for Google Smart Home fulfillment. Press Generate for a random 64-character token; saving needs at least 32 characters, and never the public default.' },
       { p: 'Skip this unless you’re wiring up Google Home.' }
     ]
   },

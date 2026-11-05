@@ -1,5 +1,6 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
 import { getSettings, updateSecurity } from './settings.js'
+import { recordGoogleAccepted, recordGoogleRejected } from './google-status.js'
 
 export const requirePasscode = (request, response, next) => {
   if (!passcodeSet()) return next()
@@ -35,7 +36,11 @@ export const isAuthenticated = (request) => !passcodeSet() || validToken(bearerT
 
 export const requireGoogleToken = (request, response, next) => {
   const expected = getSettings().google.authToken
-  if (expected && tokensMatch(bearerToken(request), expected)) return next()
+  if (expected && tokensMatch(bearerToken(request), expected)) {
+    recordGoogleAccepted('fulfillment')
+    return next()
+  }
+  recordGoogleRejected({ route: 'fulfillment', reason: 'wrong token' })
   return response.status(401).json({ error: 'Unauthorized' })
 }
 

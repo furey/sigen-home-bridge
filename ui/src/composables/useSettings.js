@@ -257,6 +257,7 @@ const EMPTY_PAIRING = { uri: '', pin: '', qr: '' }
 const data = reactive({
   setupComplete: false,
   googleAuthTokenSet: false,
+  googleStatus: null,
   homekitMetrics: [],
   googleMetrics: [],
   alertTriggers: [],

@@ -21,7 +21,9 @@ Google Home works, but it's more effort than Apple Home and the readings render 
 
 2. **In the [Google Home Developer Console](https://console.home.google.com)**, create a cloud-to-cloud project. Set the fulfillment address to `https://<your-tunnel-host>/fulfillment` and the OAuth Authorization and Token addresses to `/auth` and `/token` on the same host. The Client ID can be any non-empty value. The Client secret must be the same value as the Auth token you set in step 3; the bridge checks it before it hands Google the token.
 
-3. **Set the Auth token** in **Settings → Google Home** to a long random value (the shared password Google sends with each request; a blank `GOOGLE_AUTH_TOKEN` seeds a random one you can't read back, so set your own), then link the project in the Google Home app.
+3. **Set the Auth token** in **Settings → Google Home**: press **Generate**. It fills in a random 64-character token and copies it (if the copy fails, copy it from the field). This is the shared password Google sends with each request. Paste the same value into the console Client secret, then press **Save**. The bridge refuses a token shorter than 32 characters or the public default.
+
+4. **Link the project** in the Google Home app. The status line under the Auth token shows **Last accepted** with the time and route. An accepted fulfillment or token request confirms the link, because only a request with the right token or client secret counts. A newer **Last rejected** line (for example "wrong token" or "wrong client secret") means the console and the bridge hold different values. Press **Refresh** to check again.
 
 ## What you see
 

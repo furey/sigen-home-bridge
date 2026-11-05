@@ -7,6 +7,7 @@ import { config, CONFIG_DEFAULTS, GOOGLE_METRICS, HOMEKIT_METRICS } from './conf
 import { convertTriggerUnits, getTrigger, serializeTriggers } from './triggers.js'
 import { tariffConfigured } from './derive.js'
 import { state } from './state.js'
+import { googleStatus } from './google-status.js'
 
 export const loadSettings = () => {
   const stored = readStored()
@@ -31,13 +32,14 @@ const exposeSettings = ({ google, security, ...rest }) => ({
   ...rest,
   google: { labels: google.labels, powerUnit: google.powerUnit, batteryDisplay: google.batteryDisplay },
   googleAuthTokenSet: Boolean(google.authToken),
+  googleStatus: googleStatus(),
   security: { passcodeSet: Boolean(security.passcode) },
   homekitMetrics: HOMEKIT_METRICS,
   googleMetrics: GOOGLE_METRICS,
   alertTriggers: serializeTriggers(triggerCapabilities())
 })
 
-const redactSecrets = (settings) => ({
+const redactSecrets = ({ googleStatus: omitted, ...settings }) => ({
   ...settings,
   sigen: { ...settings.sigen, host: '' },
   homekit: { ...settings.homekit, pin: '' },

@@ -1,10 +1,12 @@
 import { randomBytes } from 'node:crypto'
 import { getSettings } from './settings.js'
 import { tokensMatch } from './security.js'
+import { recordGoogleAccepted, recordGoogleRejected } from './google-status.js'
 
 export const authorise = (request, response) => {
   const { redirect_uri: redirectUri, state } = request.query
   if (!isGoogleRedirect(redirectUri)) {
+    recordGoogleRejected({ route: 'auth', reason: 'bad redirect' })
     return response.status(400).json({
       error: 'invalid_request',
       error_description: 'redirect_uri must be a Google account-linking address'
@@ -20,6 +22,7 @@ export const exchangeToken = (request, response) => {
   const authToken = getSettings().google.authToken
   const body = request.body ?? {}
   if (!authToken || !tokensMatch(clientSecret(request), authToken)) {
+    recordGoogleRejected({ route: 'token', reason: 'wrong client secret' })
     return response.status(401).json({ error: 'invalid_client' })
   }
   if (body.grant_type === 'authorization_code') {
@@ -30,7 +33,20 @@ export const exchangeToken = (request, response) => {
       ? grant(response, authToken)
       : invalidGrant(response)
   }
+  recordGoogleRejected({ route: 'token', reason: 'unsupported grant' })
   return response.status(400).json({ error: 'unsupported_grant_type' })
+}
+
+export const rejectWeakGoogleToken = (patch) => {
+  const token = patch?.google?.authToken
+  if (token === undefined || token === null) return
+  const trimmed = String(token).trim()
+  if (trimmed === PUBLIC_DEFAULT_TOKEN) {
+    throw weakToken('google auth token must not be the public default')
+  }
+  if (trimmed.length < MIN_TOKEN_LENGTH) {
+    throw weakToken(`google auth token must be at least ${MIN_TOKEN_LENGTH} characters`)
+  }
 }
 
 export const warnIfPublicGoogleToken = () => {
@@ -70,14 +86,22 @@ const clientSecret = (request) => {
   return separator === -1 ? '' : credentials.slice(separator + 1)
 }
 
-const grant = (response, authToken) => response.json({
-  token_type: 'Bearer',
-  access_token: authToken,
-  refresh_token: authToken,
-  expires_in: SECONDS_PER_YEAR
-})
+const grant = (response, authToken) => {
+  recordGoogleAccepted('token')
+  return response.json({
+    token_type: 'Bearer',
+    access_token: authToken,
+    refresh_token: authToken,
+    expires_in: SECONDS_PER_YEAR
+  })
+}
 
-const invalidGrant = (response) => response.status(400).json({ error: 'invalid_grant' })
+const invalidGrant = (response) => {
+  recordGoogleRejected({ route: 'token', reason: 'invalid grant' })
+  return response.status(400).json({ error: 'invalid_grant' })
+}
+
+const weakToken = (message) => Object.assign(new Error(message), { status: 400 })
 
 const GOOGLE_REDIRECT_PREFIXES = [
   'https://oauth-redirect.googleusercontent.com/r/',
@@ -93,5 +117,7 @@ const MAX_CODES = 100
 const SECONDS_PER_YEAR = 31536000
 
 const PUBLIC_DEFAULT_TOKEN = 'sigen-home-bridge-token'
+
+const MIN_TOKEN_LENGTH = 32
 
 const codes = new Map()

@@ -8,6 +8,7 @@ import {
 import { useSettings } from '../composables/useSettings.js'
 import { useGatewayScan } from '../composables/useGatewayScan.js'
 import InfoTip from './InfoTip.vue'
+import GoogleTokenInput from './settings/GoogleTokenInput.vue'
 
 const STEPS = ['Welcome', 'Gateway', 'Polling', 'Weather', 'HomeKit', 'Google Home', 'Ready']
 
@@ -437,13 +438,13 @@ const fromSeconds = (value) => Math.max(1, Math.floor(Number(value) || 1)) * 100
             Static bearer token for the stub OAuth used by Google Smart Home fulfillment.
             Leave blank to keep the current value.
           </p>
-          <label class="block">
-            <span class="mb-1 flex items-center gap-1 text-sm text-zinc-400">
-              Auth token<InfoTip topic="googleToken" />
-            </span>
-            <input v-model="googleToken" type="password" autocomplete="off" :placeholder="tokenPlaceholder"
-              class="w-full rounded-lg bg-zinc-800 px-3 py-2" />
-          </label>
+          <div class="block">
+            <div class="mb-1 flex items-center gap-1 text-sm text-zinc-400">
+              <label for="wizard-google-auth-token">Auth token</label><InfoTip topic="googleToken" />
+            </div>
+            <GoogleTokenInput v-model="googleToken" :placeholder="tokenPlaceholder"
+              input-id="wizard-google-auth-token" save-step="click Next" />
+          </div>
         </div>
 
         <div v-else class="space-y-3 text-center">
