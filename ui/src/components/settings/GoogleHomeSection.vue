@@ -262,7 +262,8 @@ function buildPatch() {
   <SaveBar :status="status" :error="error" :dirty="dirty" @save="onSave">
     <template #hint>
       <span class="text-xs text-right text-zinc-600 text-balance">
-        The token applies the moment you save; no restart needed.
+        A new token must also go in the Client secret field of your Google Home Developer
+        Console project. Then relink Sigen Home Bridge in the Google Home app.
       </span>
     </template>
   </SaveBar>
