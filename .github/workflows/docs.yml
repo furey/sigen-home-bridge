@@ -16,9 +16,8 @@ on:
       - .github/workflows/docs.yml
   workflow_dispatch:
 
-# Least privilege by default; the deploy job elevates only what Pages needs.
-permissions:
-  contents: read
+# No permissions by default; each job grants itself only what it needs.
+permissions: {}
 
 # One deploy at a time. Don't cancel a running publish; let it finish.
 concurrency:
@@ -29,6 +28,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
