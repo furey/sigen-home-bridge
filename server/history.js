@@ -6,48 +6,49 @@ import { getSettings, onSettingsChange } from './settings.js'
 export const startHistory = () => {
   openDatabase()
   importLegacySnapshot()
-  samples = trim(loadStored())
+  storedRows = rowCount()
+  pruneDatabase()
+  recent = loadRecent()
+  recentStart = 0
+  keepRecent()
   onSettingsChange(onRetentionChange)
-  setInterval(pruneDatabase, MAINTENANCE_INTERVAL_MS)
   registerShutdown()
 }
 
 export const recordSample = (source) => {
   const sample = toSample(source)
-  samples.push(sample)
-  trim(samples)
+  recent.push(sample)
+  keepRecent()
   persist(sample)
 }
 
 export const getHistory = ({ limit = LIVE_LIMIT, order = 'asc', since = null, until = null, every = null } = {}) => {
-  const windowed = since == null && until == null
-    ? samples
-    : samples.filter((sample) => withinWindow(sample.t, since, until))
-  const shaped = every
-    ? downsampleHistory(windowed, bucketFloor(every, windowed))
-    : windowed.slice(-clampLimit(limit))
-  return order === 'desc' ? [...shaped].reverse() : shaped
+  const range = timeRange(since, until)
+  const rows = every > 0
+    ? bucketedRows({ ...range, everyMs: bucketFloor(bucketWidth(every), range) })
+    : latestRows({ ...range, limit: clampLimit(limit) })
+  return order === 'desc' ? rows.reverse() : rows
 }
 
-export const getHistoryAll = () => samples
+export const getHistoryAll = () => compactRecent()
 
-export const historyStats = () => ({
-  count: samples.length,
-  firstT: samples.length ? samples[0].t : null,
-  lastT: samples.length ? samples.at(-1).t : null,
-  maxSamples: MAX_SAMPLES
-})
+export const historyStats = () => {
+  if (!db) return { count: 0, firstT: null, lastT: null }
+  return { count: storedRows, firstT: firstTime(FULL_RANGE), lastT: lastTime(FULL_RANGE) }
+}
 
 export const nearestSample = ({ before = null, after = null } = {}) => {
-  if (before != null) {
-    const index = firstAtOrAfter(before) - 1
-    return index >= 0 ? samples[index] : null
-  }
-  if (after != null) {
-    const index = firstAfter(after)
-    return index < samples.length ? samples[index] : null
-  }
+  if (!db) return null
+  if (before != null) return statements.nearestBefore.get(before) ?? null
+  if (after != null) return statements.nearestAfter.get(after) ?? null
   return null
+}
+
+export const exportRows = function* ({ everyMs = 0 } = {}) {
+  const newest = lastTime(FULL_RANGE)
+  if (newest == null) return
+  const range = { from: FULL_RANGE.from, before: newest + 1 }
+  yield* everyMs > 0 ? bucketedPages({ ...range, everyMs: bucketWidth(everyMs) }) : rawPages(range)
 }
 
 export const downsampleHistory = (rows, everyMs) => {
@@ -63,8 +64,10 @@ export const historyToCsv = (rows) =>
 export const historyExportChunks = function* ({ rows, format, sliceSize = EXPORT_SLICE_ROWS }) {
   const encoder = EXPORT_ENCODERS[format] ?? EXPORT_ENCODERS.csv
   yield encoder.head
-  for (let start = 0; start < rows.length; start += sliceSize) {
-    yield encoder.slice(rows.slice(start, start + sliceSize), start === 0)
+  let first = true
+  for (const slice of slices(rows, sliceSize)) {
+    yield encoder.slice(slice, first)
+    first = false
   }
   if (encoder.tail) yield encoder.tail
 }
@@ -72,11 +75,13 @@ export const historyExportChunks = function* ({ rows, format, sliceSize = EXPORT
 export const legacyImportRows = (parsed) =>
   Array.isArray(parsed) ? parsed.filter((row) => Number.isFinite(row?.t)) : []
 
-export const MAX_SAMPLES = 250000
-
 export const LIVE_LIMIT = 20000
 
+export const MEMORY_ONLY_MAX_SAMPLES = 250000
+
 const FIELDS = ['pvPower', 'gridPower', 'batteryPower', 'batterySoc', 'loadPower', 'smartPortPower', 'outdoorTemp']
+
+const COLUMNS = ['t', ...FIELDS].join(', ')
 
 const CSV_HEADER = ['time', ...FIELDS]
 
@@ -95,39 +100,70 @@ const EXPORT_ENCODERS = {
 
 const EXPORT_SLICE_ROWS = 2000
 
+const slices = function* (rows, size) {
+  let slice = []
+  for (const row of rows) {
+    slice.push(row)
+    if (slice.length < size) continue
+    yield slice
+    slice = []
+  }
+  if (slice.length) yield slice
+}
+
+const rawPages = function* ({ from, before }) {
+  let cursor = from
+  for (;;) {
+    const page = statements.rawPage.all({ from: cursor, before, limit: EXPORT_SLICE_ROWS })
+    yield* page
+    if (page.length < EXPORT_SLICE_ROWS) return
+    cursor = page.at(-1).t + 1
+  }
+}
+
+const bucketedPages = function* ({ from, before, everyMs }) {
+  let first = firstTime({ from, before })
+  while (first != null) {
+    const pageBefore = Math.min(before, bucketStart(Math.floor(first / everyMs) + EXPORT_SLICE_ROWS, everyMs))
+    yield* bucketedRows({ from: first, before: pageBefore, everyMs })
+    first = firstTime({ from: pageBefore, before })
+  }
+}
+
+const bucketStart = (bucket, everyMs) => {
+  let start = Math.ceil(bucket * everyMs)
+  while (Math.floor((start - 1) / everyMs) >= bucket) start -= 1
+  while (Math.floor(start / everyMs) < bucket) start += 1
+  return start
+}
+
+const bucketWidth = (everyMs) => Math.max(everyMs, MIN_BUCKET_MS)
+
+const latestRows = ({ from, before, limit }) =>
+  db ? statements.latest.all({ from, before, limit }).reverse() : []
+
+const bucketedRows = ({ from, before, everyMs }) =>
+  db ? statements.bucketed.all({ from, before, every: everyMs }) : []
+
+const firstTime = (range) => (db ? statements.firstTime.get(range).t : null)
+
+const lastTime = (range) => (db ? statements.lastTime.get(range).t : null)
+
+const timeRange = (since, until) => ({
+  from: since ?? FULL_RANGE.from,
+  before: until == null ? FULL_RANGE.before : Math.floor(until) + 1
+})
+
 const clampLimit = (limit) => {
   const count = Math.floor(Number(limit))
   return Number.isFinite(count) && count > 0 ? Math.min(count, LIVE_LIMIT) : LIVE_LIMIT
 }
 
-const bucketFloor = (every, rows) => {
-  if (rows.length < 2) return every
-  return Math.max(every, (rows.at(-1).t - rows[0].t) / LIVE_LIMIT)
-}
-
-const withinWindow = (t, since, until) =>
-  (since == null || t >= since) && (until == null || t <= until)
-
-const firstAtOrAfter = (t) => {
-  let low = 0
-  let high = samples.length
-  while (low < high) {
-    const mid = (low + high) >> 1
-    if (samples[mid].t < t) low = mid + 1
-    else high = mid
-  }
-  return low
-}
-
-const firstAfter = (t) => {
-  let low = 0
-  let high = samples.length
-  while (low < high) {
-    const mid = (low + high) >> 1
-    if (samples[mid].t <= t) low = mid + 1
-    else high = mid
-  }
-  return low
+const bucketFloor = (every, range) => {
+  const first = firstTime(range)
+  const last = lastTime(range)
+  if (first == null || first === last) return every
+  return Math.max(every, (last - first) / LIVE_LIMIT)
 }
 
 const toSample = ({ lastUpdated, pvPower, gridPower, batteryPower, batterySoc, loadPower, smartPortPower, outdoorTemp }) => ({
@@ -141,49 +177,81 @@ const toSample = ({ lastUpdated, pvPower, gridPower, batteryPower, batterySoc, l
   outdoorTemp: outdoorTemp ?? null
 })
 
-const trim = (list) => {
-  dropExpired(list)
-  capToCeiling(list)
-  return list
+const keepRecent = () => {
+  recentStart = Math.max(firstFresh(), recent.length - RECENT_MAX_SAMPLES)
+  if (recentStart >= RECENT_COMPACT_AT) compactRecent()
 }
 
-const dropExpired = (list) => {
-  if (!list.length) return
-  const cutoff = list.at(-1).t - retentionMs()
-  let stale = 0
-  while (stale < list.length && list[stale].t < cutoff) stale += 1
-  if (stale > 0) list.splice(0, stale)
+const firstFresh = () => {
+  if (!recent.length) return 0
+  const cutoff = recent.at(-1).t - recentWindowMs()
+  let index = recentStart
+  while (index < recent.length && recent[index].t < cutoff) index += 1
+  return index
 }
 
-const capToCeiling = (list) => {
-  if (list.length > MAX_SAMPLES) list.splice(0, list.length - MAX_SAMPLES)
+const compactRecent = () => {
+  if (recentStart > 0) recent.splice(0, recentStart)
+  recentStart = 0
+  return recent
 }
+
+const recentWindowMs = () => Math.min(retentionMs(), RECENT_WINDOW_MS)
 
 const retentionMs = () => getSettings().history.retentionDays * DAY_MS
 
 const onRetentionChange = (changed) => {
   if (!changed.includes('history')) return
-  trim(samples)
+  keepRecent()
   pruneDatabase()
 }
 
 const openDatabase = () => {
   try {
-    db = new DatabaseSync(config.paths.historyDb)
-    db.exec('PRAGMA journal_mode = WAL')
-    db.exec('PRAGMA synchronous = NORMAL')
-    db.exec(CREATE_TABLE)
-    ensureSmartPortColumn()
-    insertStatement = db.prepare(INSERT_ROW)
+    db = openStore(config.paths.historyDb)
+    memoryOnly = false
   } catch (error) {
-    db = null
-    insertStatement = null
     log(`database unavailable; keeping history in memory only: ${error.message}`)
+    db = openStore(MEMORY_DATABASE)
+    memoryOnly = true
+  }
+  statements = prepareStatements()
+  storedRows = 0
+  lastPruneCutoff = -Infinity
+}
+
+const openStore = (path) => {
+  const store = new DatabaseSync(path)
+  try {
+    store.exec('PRAGMA journal_mode = WAL')
+    store.exec('PRAGMA synchronous = NORMAL')
+    store.exec(CREATE_TABLE)
+    ensureSmartPortColumn(store)
+    return store
+  } catch (error) {
+    store.close()
+    throw error
   }
 }
 
+const prepareStatements = () => ({
+  insert: db.prepare(INSERT_ROW),
+  exists: db.prepare('SELECT 1 AS found FROM samples WHERE t = ?'),
+  pruneBefore: db.prepare('DELETE FROM samples WHERE t < ?'),
+  dropOldest: db.prepare('DELETE FROM samples WHERE t < (SELECT t FROM samples ORDER BY t LIMIT 1 OFFSET ?)'),
+  count: db.prepare('SELECT COUNT(*) AS count FROM samples'),
+  firstTime: db.prepare('SELECT MIN(t) AS t FROM samples WHERE t >= :from AND t < :before'),
+  lastTime: db.prepare('SELECT MAX(t) AS t FROM samples WHERE t >= :from AND t < :before'),
+  latest: db.prepare(`SELECT ${COLUMNS} FROM samples WHERE t >= :from AND t < :before ORDER BY t DESC LIMIT :limit`),
+  rawPage: db.prepare(`SELECT ${COLUMNS} FROM samples WHERE t >= :from AND t < :before ORDER BY t LIMIT :limit`),
+  recentFrom: db.prepare(`SELECT ${COLUMNS} FROM samples WHERE t >= ? ORDER BY t`),
+  nearestBefore: db.prepare(`SELECT ${COLUMNS} FROM samples WHERE t < ? ORDER BY t DESC LIMIT 1`),
+  nearestAfter: db.prepare(`SELECT ${COLUMNS} FROM samples WHERE t > ? ORDER BY t LIMIT 1`),
+  bucketed: db.prepare(BUCKETED_ROWS)
+})
+
 const importLegacySnapshot = () => {
-  if (!db || rowCount() > 0 || !existsSync(config.paths.history)) return
+  if (memoryOnly || rowCount() > 0 || !existsSync(config.paths.history)) return
   const rows = parseLegacySnapshot()
   if (!rows.length) return
   insertMany(rows)
@@ -200,34 +268,39 @@ const parseLegacySnapshot = () => {
   }
 }
 
-const ensureSmartPortColumn = () => {
-  const columns = db.prepare('PRAGMA table_info(samples)').all().map((column) => column.name)
-  if (!columns.includes('smartPortPower')) db.exec('ALTER TABLE samples ADD COLUMN smartPortPower REAL')
+const ensureSmartPortColumn = (store) => {
+  const columns = store.prepare('PRAGMA table_info(samples)').all().map((column) => column.name)
+  if (!columns.includes('smartPortPower')) store.exec('ALTER TABLE samples ADD COLUMN smartPortPower REAL')
 }
 
-const loadStored = () => {
-  if (!db) return []
-  const rows = db.prepare(`
-    SELECT t, pvPower, gridPower, batteryPower, batterySoc, loadPower, smartPortPower, outdoorTemp
-    FROM samples ORDER BY t
-  `).all()
-  log(`restored ${rows.length} samples`)
-  return rows
+const loadRecent = () => {
+  const newest = lastTime(FULL_RANGE)
+  if (newest == null) return []
+  log(`restored ${historyStats().count} samples`)
+  return statements.recentFrom.all(newest - recentWindowMs())
 }
 
 const persist = (sample) => {
-  if (!insertStatement) return
+  if (!db) return
   try {
-    insertStatement.run(...rowValues(sample))
+    insertRow(sample)
+    pruneFrom(sample.t)
+    capMemoryOnly()
   } catch (error) {
     log(`insert failed: ${error.message}`)
   }
 }
 
+const insertRow = (sample) => {
+  const isNew = !statements.exists.get(sample.t)
+  statements.insert.run(...rowValues(sample))
+  if (isNew) storedRows += 1
+}
+
 const insertMany = (rows) => {
   db.exec('BEGIN')
   try {
-    for (const row of rows) insertStatement.run(...rowValues(row))
+    for (const row of rows) statements.insert.run(...rowValues(row))
     db.exec('COMMIT')
   } catch (error) {
     db.exec('ROLLBACK')
@@ -239,16 +312,30 @@ const rowValues = ({ t, pvPower, gridPower, batteryPower, batterySoc, loadPower,
   [t, pvPower ?? null, gridPower ?? null, batteryPower ?? null, batterySoc ?? null, loadPower ?? null,
     smartPortPower ?? null, outdoorTemp ?? null]
 
-const rowCount = () => (db ? db.prepare('SELECT COUNT(*) AS count FROM samples').get().count : 0)
+const rowCount = () => (db ? statements.count.get().count : 0)
 
 const pruneDatabase = () => {
-  if (!db || !samples.length) return
+  const newest = lastTime(FULL_RANGE)
+  if (newest == null) return
   try {
-    db.prepare('DELETE FROM samples WHERE t < ?').run(samples.at(-1).t - retentionMs())
-    db.prepare(DELETE_BEYOND_CEILING).run(MAX_SAMPLES)
+    pruneFrom(newest, { force: true })
   } catch (error) {
     log(`prune failed: ${error.message}`)
   }
+}
+
+const pruneFrom = (newestT, { force = false } = {}) => {
+  const cutoff = newestT - retentionMs()
+  if (!force && cutoff - lastPruneCutoff < PRUNE_STEP_MS) return
+  const { changes } = statements.pruneBefore.run(cutoff)
+  storedRows -= changes
+  lastPruneCutoff = cutoff
+}
+
+const capMemoryOnly = () => {
+  if (!memoryOnly || storedRows <= MEMORY_ONLY_MAX_SAMPLES) return
+  const { changes } = statements.dropOldest.run(storedRows - MEMORY_ONLY_MAX_SAMPLES)
+  storedRows -= changes
 }
 
 const registerShutdown = () => {
@@ -277,15 +364,53 @@ const INSERT_ROW = `INSERT OR REPLACE INTO samples
   (t, pvPower, gridPower, batteryPower, batterySoc, loadPower, smartPortPower, outdoorTemp)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 
-const DELETE_BEYOND_CEILING =
-  'DELETE FROM samples WHERE t < (SELECT MIN(t) FROM (SELECT t FROM samples ORDER BY t DESC LIMIT ?))'
+const bucketOf = (column) => `CAST(CAST(${column} AS REAL) / :every AS INTEGER)`
 
-const MAINTENANCE_INTERVAL_MS = 300000
+const BUCKETED_ROWS = `
+  WITH RECURSIVE firsts(t) AS (
+    SELECT MIN(t) FROM samples WHERE t >= :from AND t < :before
+    UNION ALL
+    SELECT (
+      SELECT MIN(s.t) FROM samples s
+      WHERE s.t >= CAST((${bucketOf('firsts.t')} + 1) * :every AS INTEGER) - 1
+        AND s.t < :before
+        AND ${bucketOf('s.t')} > ${bucketOf('firsts.t')}
+    ) FROM firsts WHERE firsts.t IS NOT NULL
+  ),
+  spans AS (
+    SELECT t AS first, LEAD(t) OVER (ORDER BY t) AS next FROM firsts WHERE t IS NOT NULL
+  )
+  SELECT ${COLUMNS} FROM samples WHERE t IN (
+    SELECT (SELECT MAX(s.t) FROM samples s WHERE s.t >= spans.first AND s.t < COALESCE(spans.next, :before))
+    FROM spans
+  ) ORDER BY t`
+
+const FULL_RANGE = { from: Number.MIN_SAFE_INTEGER, before: Number.MAX_SAFE_INTEGER }
+
+const MEMORY_DATABASE = ':memory:'
+
+const MIN_BUCKET_MS = 1000
+
+const PRUNE_STEP_MS = 60000
+
+const RECENT_WINDOW_MS = 26 * 3600000
+
+const RECENT_MAX_SAMPLES = 100000
+
+const RECENT_COMPACT_AT = 10000
 
 const DAY_MS = 86400000
 
 let db = null
 
-let insertStatement = null
+let memoryOnly = false
 
-let samples = []
+let storedRows = 0
+
+let lastPruneCutoff = -Infinity
+
+let statements = null
+
+let recent = []
+
+let recentStart = 0

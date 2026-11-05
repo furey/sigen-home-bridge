@@ -4,9 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 import { state, subscribe } from './state.js'
 import { buildSnapshot } from './snapshot.js'
-import {
-  getHistory, getHistoryAll, historyStats, nearestSample, downsampleHistory, historyExportChunks
-} from './history.js'
+import { getHistory, historyStats, nearestSample, exportRows, historyExportChunks } from './history.js'
 import { getSettings, publicSettings, resetSettings, updateSettings } from './settings.js'
 import { testGateway } from './modbus.js'
 import { discoverGateways } from './discover.js'
@@ -190,7 +188,7 @@ const discoverGatewayHandler = async (request, response) => {
 }
 
 const exportHistory = async (request, response, stallMs) => {
-  const rows = downsampleHistory(getHistoryAll().slice(), exportIntervalMs(request.query.every))
+  const rows = exportRows({ everyMs: exportIntervalMs(request.query.every) })
   const stamp = new Date().toISOString().slice(0, 10)
   const format = request.query.format === 'json' ? 'json' : 'csv'
   response.setHeader('Content-Type', EXPORT_CONTENT_TYPES[format])

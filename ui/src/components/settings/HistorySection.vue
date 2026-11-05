@@ -75,24 +75,6 @@ const spanLabel = computed(() => {
   return hours >= 1 ? `${hours.toFixed(1)} hours` : 'under an hour'
 })
 
-const pollIntervalMs = computed(() => data.poll?.defaultIntervalMs ?? 5000)
-
-const hasFasterWindows = computed(() =>
-  (data.poll?.schedule ?? []).some((window) => window.intervalMs < pollIntervalMs.value))
-
-const ceilingDays = computed(() => {
-  if (!stats.value?.maxSamples) return null
-  return Math.floor((stats.value.maxSamples * pollIntervalMs.value) / 86400000)
-})
-
-const pollLabel = computed(() => {
-  const seconds = pollIntervalMs.value / 1000
-  return seconds >= 60 ? `${+(seconds / 60).toFixed(1)} min` : `${+seconds.toFixed(1)} s`
-})
-
-const ceilingBindsRetention = computed(() =>
-  ceilingDays.value !== null && form.retentionDays > ceilingDays.value)
-
 function snapshot() {
   return { retentionDays: Number(form.retentionDays) }
 }
@@ -121,17 +103,8 @@ function buildPatch() {
     </div>
     <p class="mb-3 text-xs text-zinc-500">
       How long recorded readings are kept for the Trends chart and export. Older samples are dropped;
-      lowering this discards anything past the new window. Longer windows hold more in memory; at a
-      5-second poll a week is roughly 120,000 readings.
-    </p>
-    <p v-if="ceilingDays !== null" class="mb-3 text-xs text-zinc-500">
-      The bridge keeps at most {{ stats.maxSamples.toLocaleString() }} readings. At your {{ pollLabel }}
-      poll that's about {{ ceilingDays }} days<template v-if="hasFasterWindows">, less while faster
-      schedule windows run</template>.
-    </p>
-    <p v-if="ceilingBindsRetention" class="mb-3 text-xs text-amber-400">
-      Only about the newest {{ ceilingDays }} days fit, so readings older than that are dropped before
-      the {{ form.retentionDays }}-day window is reached.
+      lowering this discards anything past the new window. Longer windows use more disk space: at a
+      5-second poll, a week is roughly 120,000 readings (about 4 MB).
     </p>
     <input v-model.number="form.retentionDays" type="range" :min="RETENTION_MIN" :max="RETENTION_MAX"
       step="1" class="w-full" />

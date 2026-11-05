@@ -1,18 +1,29 @@
-import { rmSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
-const dataDir = fileURLToPath(new URL('../../tmp/test-data-history', import.meta.url))
+const dataDir = mkdtempSync(join(tmpdir(), 'sigen-history-'))
 
 process.env.DATA_DIR = dataDir
 process.env.HISTORY_RETENTION_DAYS = '7'
 
 const {
-  getHistory, getHistoryAll, recordSample, downsampleHistory, historyToCsv, historyStats, historyExportChunks,
-  nearestSample, legacyImportRows, MAX_SAMPLES, LIVE_LIMIT
+  startHistory, getHistory, getHistoryAll, recordSample, downsampleHistory, historyToCsv, historyStats,
+  historyExportChunks, exportRows, nearestSample, legacyImportRows, LIVE_LIMIT
 } = await import('../history.js')
 
-beforeAll(() => rmSync(dataDir, { recursive: true, force: true }))
+const TEST_CLOCK = Date.parse('2500-01-01T00:00:00.000Z')
+
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ['Date'], now: TEST_CLOCK })
+  startHistory()
+})
+
+afterAll(() => {
+  vi.useRealTimers()
+  rmSync(dataDir, { recursive: true, force: true })
+})
 
 const DAY_MS = 86400000
 
@@ -55,9 +66,10 @@ describe('history', () => {
   })
 
   it('falls back to now when the reading has no timestamp', () => {
-    const before = Date.now()
+    vi.setSystemTime(Date.parse('2026-06-12T00:00:00.000Z'))
     recordSample(reading({ lastUpdated: null }))
-    expect(getHistory().at(-1).t).toBeGreaterThanOrEqual(before)
+    expect(getHistory().at(-1).t).toBe(Date.parse('2026-06-12T00:00:00.000Z'))
+    vi.setSystemTime(TEST_CLOCK)
   })
 })
 
@@ -66,7 +78,7 @@ describe('history retention', () => {
     const base = Date.parse('2031-01-01T00:00:00.000Z')
     recordSample(reading({ lastUpdated: new Date(base).toISOString(), loadPower: 111 }))
     recordSample(reading({ lastUpdated: new Date(base + 10 * DAY_MS).toISOString(), loadPower: 222 }))
-    const all = getHistoryAll()
+    const all = getHistory({ since: base - DAY_MS })
     expect(all.some((sample) => sample.loadPower === 111)).toBe(false)
     expect(all.at(-1).loadPower).toBe(222)
   })
@@ -75,9 +87,18 @@ describe('history retention', () => {
     const base = Date.parse('2032-01-01T00:00:00.000Z')
     recordSample(reading({ lastUpdated: new Date(base).toISOString(), loadPower: 333 }))
     recordSample(reading({ lastUpdated: new Date(base + 3 * DAY_MS).toISOString(), loadPower: 444 }))
-    const all = getHistoryAll()
+    const all = getHistory({ since: base - DAY_MS })
     expect(all.some((sample) => sample.loadPower === 333)).toBe(true)
     expect(all.some((sample) => sample.loadPower === 444)).toBe(true)
+  })
+
+  it('holds only the last 26 hours in memory', () => {
+    const base = Date.parse('2033-01-01T00:00:00.000Z')
+    recordSample(reading({ lastUpdated: new Date(base).toISOString(), loadPower: 555 }))
+    recordSample(reading({ lastUpdated: new Date(base + 25 * 3600000).toISOString(), loadPower: 666 }))
+    recordSample(reading({ lastUpdated: new Date(base + 27 * 3600000).toISOString(), loadPower: 777 }))
+    expect(getHistoryAll().map((sample) => sample.loadPower)).toEqual([666, 777])
+    expect(getHistory({ since: base }).map((sample) => sample.loadPower)).toEqual([555, 666, 777])
   })
 })
 
@@ -113,15 +134,9 @@ describe('history CSV', () => {
 })
 
 describe('history stats', () => {
-  it('reports the sample ceiling so the UI can state the effective retention', () => {
-    expect(historyStats().maxSamples).toBe(MAX_SAMPLES)
-  })
-
   it('reports the count and time span of the retained samples', () => {
-    const stats = historyStats()
-    expect(stats.count).toBe(getHistoryAll().length)
-    expect(stats.firstT).toBe(getHistoryAll()[0].t)
-    expect(stats.lastT).toBe(getHistoryAll().at(-1).t)
+    const stored = [...exportRows()]
+    expect(historyStats()).toEqual({ count: stored.length, firstT: stored[0].t, lastT: stored.at(-1).t })
   })
 })
 
@@ -142,16 +157,15 @@ describe('legacy import', () => {
 })
 
 describe('history limits', () => {
-  it('caps the stored buffer at MAX_SAMPLES and the live feed at LIVE_LIMIT', () => {
+  it('caps the live feed at LIVE_LIMIT', () => {
     const base = Date.parse('2040-01-01T00:00:00.000Z')
-    for (let index = 0; index < MAX_SAMPLES + 5; index += 1) {
-      recordSample(reading({ lastUpdated: new Date(base + index).toISOString(), loadPower: index }))
+    for (let index = 0; index < LIVE_LIMIT + 5; index += 1) {
+      recordSample(reading({ lastUpdated: new Date(base + index * 1000).toISOString(), loadPower: index }))
     }
-    expect(getHistoryAll().length).toBe(MAX_SAMPLES)
-    expect(getHistoryAll().at(-1).loadPower).toBe(MAX_SAMPLES + 4)
     expect(getHistory().length).toBe(LIVE_LIMIT)
-    expect(getHistory().at(-1).loadPower).toBe(MAX_SAMPLES + 4)
-  })
+    expect(getHistory().at(-1).loadPower).toBe(LIVE_LIMIT + 4)
+    expect(getHistory()[0].loadPower).toBe(5)
+  }, 30000)
 })
 
 describe('history query options', () => {
@@ -272,6 +286,35 @@ describe('history export chunks', () => {
   it('matches the buffered JSON for full, partial, and empty exports', () => {
     for (const slice of [rows, rows.slice(0, 3), rows.slice(0, 1), []]) {
       expect(joined('json', slice)).toBe(JSON.stringify(slice))
+    }
+  })
+})
+
+describe('history database downsampling', () => {
+  const base = Date.parse('2400-01-01T00:00:00.000Z')
+  const offsets = Array.from({ length: 4000 }, (_, index) => index * 5000 + ((index * 7919) % 4999))
+    .filter((offset, index) => index % 97 > 9)
+
+  beforeAll(() => {
+    for (const [index, offset] of offsets.entries()) {
+      recordSample(reading({ lastUpdated: new Date(base + offset).toISOString(), loadPower: index }))
+    }
+  })
+
+  it('matches the in-memory downsample for whole and fractional buckets', () => {
+    const raw = getHistory({ since: base, limit: LIVE_LIMIT })
+    for (const every of [5000, 7000, 60000, 1234.567, 1000.5]) {
+      const since = base + 12345.6
+      const until = base + 15000000.4
+      const window = raw.filter((row) => row.t >= since && row.t <= until)
+      expect(getHistory({ since, until, every })).toEqual(downsampleHistory(window, every))
+    }
+  })
+
+  it('matches the in-memory downsample on export pages', () => {
+    const raw = [...exportRows()]
+    for (const everyMs of [60000, 1000, 13000]) {
+      expect([...exportRows({ everyMs })]).toEqual(downsampleHistory(raw, everyMs))
     }
   })
 })
