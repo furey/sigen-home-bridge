@@ -23,7 +23,7 @@ Google Home works, but it's more effort than Apple Home and the readings render 
 
 3. **Set the Auth token** in **Settings → Google Home**: press **Generate**. It fills in a random 64-character token and copies it (if the copy fails, copy it from the field). This is the shared password Google sends with each request. Paste the same value into the console Client secret, then press **Save**. The bridge refuses a token shorter than 32 characters or the public default.
 
-4. **Link the project** in the Google Home app, then press **Check link** under the Auth token. "Linked with Google" or "Google last connected" confirms the link, because only a request with the right token or client secret counts. A red line says what went wrong and what to do: for example, Google sent an old token (relink), or the console Client secret does not match. The status resets when the bridge restarts.
+4. **Link the project** in the Google Home app, then press **Check Google connection** under the Auth token. "Linked with Google" or "Google last connected" confirms the link, because only a request with the right token or client secret counts. A red line says what went wrong and what to do: for example, Google sent an old token (relink), or the console Client secret does not match. The status resets when the bridge restarts.
 
 ## What you see
 

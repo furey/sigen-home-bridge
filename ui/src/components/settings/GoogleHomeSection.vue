@@ -185,7 +185,7 @@ function buildPatch() {
           hover:bg-zinc-700 disabled:opacity-50"
         :disabled="refreshing" @click="refreshStatus">
         <LoaderCircle v-if="refreshing" class="w-4 h-4 animate-spin" />
-        <RefreshCw v-else class="w-4 h-4" />{{ refreshing ? 'Checking…' : 'Check link' }}
+        <RefreshCw v-else class="w-4 h-4" />{{ refreshing ? 'Checking…' : 'Check Google connection' }}
       </button>
       <div class="min-w-0 flex-1 basis-56 space-y-0.5">
         <p v-for="line in statusLines" :key="line.text" class="text-sm text-pretty"
