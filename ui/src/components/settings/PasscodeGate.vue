@@ -174,7 +174,7 @@ const REDUCED_DISMISS_MS = 150
 }
 
 .gate-success {
-  animation: gate-success 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: gate-success 0.5s;
 }
 
 .gate-dismiss {
@@ -187,8 +187,8 @@ const REDUCED_DISMISS_MS = 150
 }
 
 @keyframes gate-success {
-  0% { transform: scale(0.96); }
-  60% { transform: scale(1.03); }
+  0% { transform: scale(1); animation-timing-function: cubic-bezier(0.2, 0, 0.2, 1); }
+  40% { transform: scale(1.04); animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
   100% { transform: scale(1); }
 }
 
