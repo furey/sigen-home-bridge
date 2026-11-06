@@ -40,6 +40,13 @@ const storedCount = () => {
   return count
 }
 
+const storedFirstT = () => {
+  const db = new DatabaseSync(join(dataDir, 'history.db'))
+  const { t } = db.prepare('SELECT MIN(t) AS t FROM samples').get()
+  db.close()
+  return t
+}
+
 seedLegacyDatabase()
 
 const { loadSettings, updateSettings } = await import('../settings.js')
@@ -190,11 +197,11 @@ describe('history upkeep', () => {
   })
 
   it('prunes on insert only once the cutoff has moved a minute', () => {
-    const firstT = historyStats().firstT
+    const firstT = storedFirstT()
     recordSample(reading(NEWEST + 7 * STEP_MS))
-    expect(historyStats().firstT).toBe(firstT)
+    expect(storedFirstT()).toBe(firstT)
     recordSample(reading(NEWEST + 14 * STEP_MS))
-    expect(historyStats().firstT).toBe(NEWEST + 14 * STEP_MS - 20 * DAY_MS)
+    expect(storedFirstT()).toBe(NEWEST + 14 * STEP_MS - 20 * DAY_MS)
     expect(historyStats().count).toBe(storedCount())
   })
 })

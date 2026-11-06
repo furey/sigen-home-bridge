@@ -23,7 +23,7 @@ export const recordSample = (source) => {
 }
 
 export const getHistory = ({ limit = LIVE_LIMIT, order = 'asc', since = null, until = null, every = null } = {}) => {
-  const range = timeRange(since, until)
+  const range = timeRange(Math.max(since ?? FULL_RANGE.from, retainedFloor()), until)
   const rows = every > 0
     ? bucketedRows({ ...range, everyMs: bucketFloor(bucketWidth(every), range) })
     : latestRows({ ...range, limit: clampLimit(limit) })
@@ -34,20 +34,22 @@ export const getRecentHistory = () => compactRecent()
 
 export const historyStats = () => {
   if (!db) return { count: 0, firstT: null, lastT: null }
-  return { count: storedRows, firstT: firstTime(FULL_RANGE), lastT: lastTime(FULL_RANGE) }
+  const from = retainedFloor()
+  return { count: retainedCount(from), firstT: firstTime({ ...FULL_RANGE, from }), lastT: lastTime(FULL_RANGE) }
 }
 
 export const nearestSample = ({ before = null, after = null } = {}) => {
   if (!db) return null
-  if (before != null) return statements.nearestBefore.get(before) ?? null
-  if (after != null) return statements.nearestAfter.get(after) ?? null
+  const floor = retainedFloor()
+  if (before != null) return retainedOnly(statements.nearestBefore.get(before), floor)
+  if (after != null) return statements.nearestAfter.get(Math.max(after, floor - 1)) ?? null
   return null
 }
 
 export const exportRows = function* ({ everyMs = 0 } = {}) {
   const newest = lastTime(FULL_RANGE)
   if (newest == null) return
-  const range = { from: FULL_RANGE.from, before: newest + 1 }
+  const range = { from: newest - retentionMs(), before: newest + 1 }
   yield* everyMs > 0 ? bucketedPages({ ...range, everyMs: bucketWidth(everyMs) }) : rawPages(range)
 }
 
@@ -149,6 +151,16 @@ const firstTime = (range) => (db ? statements.firstTime.get(range).t : null)
 
 const lastTime = (range) => (db ? statements.lastTime.get(range).t : null)
 
+const retainedFloor = () => {
+  const newest = lastTime(FULL_RANGE)
+  return newest == null ? FULL_RANGE.from : newest - retentionMs()
+}
+
+const retainedCount = (from) =>
+  retentionMs() < RECENT_WINDOW_MS ? storedRows - statements.countBefore.get(from).count : storedRows
+
+const retainedOnly = (sample, floor) => (sample && sample.t >= floor ? sample : null)
+
 const timeRange = (since, until) => ({
   from: since ?? FULL_RANGE.from,
   before: until == null ? FULL_RANGE.before : Math.floor(until) + 1
@@ -237,6 +249,7 @@ const prepareStatements = () => ({
   pruneBefore: db.prepare('DELETE FROM samples WHERE t < ?'),
   dropOldest: db.prepare('DELETE FROM samples WHERE t < (SELECT t FROM samples ORDER BY t LIMIT 1 OFFSET ?)'),
   count: db.prepare('SELECT COUNT(*) AS count FROM samples'),
+  countBefore: db.prepare('SELECT COUNT(*) AS count FROM samples WHERE t < ?'),
   firstTime: db.prepare('SELECT MIN(t) AS t FROM samples WHERE t >= :from AND t < :before'),
   lastTime: db.prepare('SELECT MAX(t) AS t FROM samples WHERE t >= :from AND t < :before'),
   latest: db.prepare(`SELECT ${COLUMNS} FROM samples WHERE t >= :from AND t < :before ORDER BY t DESC LIMIT :limit`),
@@ -322,7 +335,7 @@ const pruneDatabase = () => {
 }
 
 const pruneFrom = (newestT, { force = false } = {}) => {
-  const cutoff = newestT - retentionMs()
+  const cutoff = newestT - Math.max(retentionMs(), RECENT_WINDOW_MS)
   if (!force && cutoff - lastPruneCutoff < PRUNE_STEP_MS) return
   const { changes } = statements.pruneBefore.run(cutoff)
   storedRows -= changes
