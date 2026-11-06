@@ -56,7 +56,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
 </script>
 
 <template>
-  <main class="flex flex-col gap-3 min-h-app p-safe sm:gap-4">
+  <main v-reveal class="flex flex-col gap-3 min-h-app p-safe sm:gap-4">
     <header class="grid items-center grid-cols-3">
       <div class="flex justify-start">
         <button
@@ -93,8 +93,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
       </div>
     </header>
 
-    <div class="flex-1">
-      <section v-if="hasDevices" class="flex flex-col gap-3 sm:gap-4">
+    <div v-reveal class="flex-1">
+      <section v-if="hasDevices" v-reveal class="flex flex-col gap-3 sm:gap-4">
         <article
           v-for="device in inverters"
           :key="device.unitId"

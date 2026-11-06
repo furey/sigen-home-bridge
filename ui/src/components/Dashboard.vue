@@ -124,6 +124,7 @@ const lastUpdated = computed(() =>
 
 <template>
   <main
+    v-reveal
     class="flex flex-col gap-3 min-h-app p-safe sm:gap-4"
     :class="{ 'trends-page': trendsActive }"
   >
@@ -181,7 +182,7 @@ const lastUpdated = computed(() =>
       mode="out-in"
     >
     <TrendsView v-if="trendsActive" key="trends" class="flex-1" />
-    <section v-else key="quadrants" class="grid flex-1 min-h-0 grid-cols-1 gap-3 quadrants sm:grid-cols-2 sm:gap-4">
+    <section v-else key="quadrants" v-reveal class="grid flex-1 min-h-0 grid-cols-1 gap-3 quadrants sm:grid-cols-2 sm:gap-4">
       <template v-for="cell in quadrants" :key="cell.key">
         <div
           v-if="cell.key === 'battery'"

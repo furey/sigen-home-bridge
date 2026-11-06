@@ -113,7 +113,7 @@ watch([isDesktop, () => route.name], () => {
           </div>
         </nav>
 
-        <div class="flex-1 min-w-0 space-y-4 pb-6">
+        <div v-reveal="{ key: route.name }" class="flex-1 min-w-0 space-y-4 pb-6">
           <RouterView v-slot="{ Component }">
             <component :is="Component" />
           </RouterView>

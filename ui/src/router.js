@@ -71,3 +71,25 @@ router.beforeEach(async (to, from) => {
   if (to.name !== 'dashboard' && to.name !== 'trends') return true
   return (await useSettings().shouldRunSetup()) ? { name: 'setup' } : true
 })
+
+export const latestArrival = () => arrival
+
+let arrival = null
+
+let navigationIsPop = false
+
+router.options.history.listen((to, from, info) => { navigationIsPop = info.type === 'pop' })
+
+router.afterEach((to, from, failure) => {
+  arrival = {
+    fresh: !navigationIsPop && !failure,
+    at: performance.now(),
+    revealed: false,
+    sameView: sameViewOf(to, from),
+    view: String(to.name)
+  }
+  navigationIsPop = false
+})
+
+const sameViewOf = (to, from) =>
+  Boolean(from.matched[0]) && from.matched[0].components?.default === to.matched[0]?.components?.default
