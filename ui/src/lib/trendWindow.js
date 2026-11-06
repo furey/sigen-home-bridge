@@ -12,6 +12,12 @@ export const calendarLabel = ({ mode, offset = 0, start, end }) => {
   return new Date(start).toLocaleDateString([], { month: 'long', year: 'numeric' })
 }
 
+export const dayBounds = ({ start, end }) => {
+  const bounds = [start]
+  while (bounds.at(-1) < end) bounds.push(dayStart(bounds.at(-1), 1))
+  return bounds
+}
+
 export const calendarTicks = ({ mode, start, end }) => {
   if (mode === 'day') return DAY_TICK_HOURS.map((hour) => hourTick(start, hour))
   if (mode === 'week') return Array.from({ length: WEEK_DAYS }, (_, index) => weekdayTick(start, index))

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calendarLabel, calendarTicks, calendarWindow } from './trendWindow.js'
+import { calendarLabel, calendarTicks, calendarWindow, dayBounds } from './trendWindow.js'
 
 const HOUR_MS = 3600000
 
@@ -110,5 +110,21 @@ describe('calendar windows across clock changes', () => {
   it('keeps the 29th in a leap February', () => {
     const window = calendarWindow({ mode: 'month', now: local('2028-02-10T09:00:00') })
     expect(calendarTicks({ mode: 'month', ...window })).toHaveLength(5)
+  })
+})
+
+describe('day bounds', () => {
+  it('splits a week into seven local days', () => {
+    const window = calendarWindow({ mode: 'week', now: local('2026-11-06T20:32:00') })
+    const bounds = dayBounds(window)
+    expect(bounds).toHaveLength(8)
+    expect(bounds.at(-1)).toBe(window.end)
+  })
+
+  it('keeps every bound on local midnight across the daylight saving start', () => {
+    const window = calendarWindow({ mode: 'month', now: local('2026-10-20T12:00:00') })
+    const bounds = dayBounds(window)
+    expect(bounds).toHaveLength(32)
+    expect(bounds.every((t) => new Date(t).getHours() === 0)).toBe(true)
   })
 })

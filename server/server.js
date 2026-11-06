@@ -4,7 +4,9 @@ import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 import { state, subscribe } from './state.js'
 import { buildSnapshot } from './snapshot.js'
-import { getHistory, historyStats, nearestSample, exportRows, historyExportChunks } from './history.js'
+import {
+  getHistory, historyStats, nearestSample, exportRows, historyExportChunks, energyByPeriods, parseEnergyBounds
+} from './history.js'
 import { getSettings, publicSettings, resetSettings, updateSettings } from './settings.js'
 import { testGateway } from './modbus.js'
 import { discoverGateways } from './discover.js'
@@ -43,6 +45,7 @@ export const createApp = ({ maxEventClients = MAX_EVENT_CLIENTS, stallMs = MAX_S
   app.get('/api/history/stats', (request, response) => response.json(historyStats()))
   app.get('/api/history/nearest', (request, response) =>
     response.json(nearestSample(nearestQuery(request.query))))
+  app.get('/api/history/energy', historyEnergy)
   app.get('/api/history/export', (request, response) => exportHistory(request, response, stallMs))
   app.get('/api/settings', (request, response) =>
     response.json(publicSettings({ authenticated: isAuthenticated(request) })))
@@ -86,6 +89,12 @@ const historyQuery = ({ order, limit, since, until, every }) => ({
   until: parseTime(until),
   every: exportIntervalMs(every) || undefined
 })
+
+const historyEnergy = (request, response) => {
+  const bounds = parseEnergyBounds(request.query.bounds)
+  if (!bounds) return response.status(400).json({ error: 'bounds must be 2 to 33 ascending timestamps' })
+  return response.json(energyByPeriods(bounds))
+}
 
 const nearestQuery = ({ before, after }) => ({
   before: parseTime(before),

@@ -46,6 +46,26 @@ export const nearestSample = ({ before = null, after = null } = {}) => {
   return null
 }
 
+export const energyByPeriods = (bounds) => {
+  const newest = lastTime(FULL_RANGE)
+  const floor = retainedFloor()
+  return bounds.slice(0, -1).map((start, index) => {
+    const end = bounds[index + 1]
+    const range = { from: Math.max(start, floor), before: Math.min(end, (newest ?? start) + 1) }
+    if (!db || newest == null || range.from >= range.before) return emptyPeriod(start, end)
+    const complete = end <= newest && end <= Date.now() && start >= floor
+    if (!complete) return periodEnergy(start, end, range)
+    return cachedPeriod(`${start}|${end}`, () => periodEnergy(start, end, range))
+  })
+}
+
+export const parseEnergyBounds = (text) => {
+  const bounds = String(text ?? '').split(',').filter(Boolean).map(Number)
+  if (bounds.length < 2 || bounds.length > MAX_ENERGY_BOUNDS) return null
+  const ascending = bounds.every((t, index) => Number.isFinite(t) && (index === 0 || t > bounds[index - 1]))
+  return ascending ? bounds : null
+}
+
 export const exportRows = function* ({ everyMs = 0 } = {}) {
   const newest = lastTime(FULL_RANGE)
   if (newest == null) return
@@ -151,6 +171,38 @@ const firstTime = (range) => (db ? statements.firstTime.get(range).t : null)
 
 const lastTime = (range) => (db ? statements.lastTime.get(range).t : null)
 
+const emptyPeriod = (start, end) => ({
+  start,
+  end,
+  energy: Object.fromEntries(ENERGY_FIELDS.map((field) => [field, { positive: 0, negative: 0 }])),
+  socStart: null,
+  socEnd: null
+})
+
+const cachedPeriod = (key, compute) => {
+  if (periodCache.has(key)) return periodCache.get(key)
+  const period = compute()
+  periodCache.set(key, period)
+  if (periodCache.size > PERIOD_CACHE_LIMIT) periodCache.delete(periodCache.keys().next().value)
+  return period
+}
+
+const periodEnergy = (start, end, range) => {
+  const sums = statements.energy.get({ ...range, gap: ENERGY_GAP_MS })
+  return {
+    start,
+    end,
+    energy: Object.fromEntries(ENERGY_FIELDS.map((field) => [field, {
+      positive: wattMsToKwh(sums[`${field}Positive`]),
+      negative: wattMsToKwh(sums[`${field}Negative`])
+    }])),
+    socStart: statements.firstSoc.get(range)?.batterySoc ?? null,
+    socEnd: statements.lastSoc.get(range)?.batterySoc ?? null
+  }
+}
+
+const wattMsToKwh = (wattMs) => Math.round((wattMs ?? 0) / WATT_MS_PER_KWH * 1000) / 1000 || 0
+
 const retainedFloor = () => {
   const newest = lastTime(FULL_RANGE)
   return newest == null ? FULL_RANGE.from : newest - retentionMs()
@@ -212,6 +264,7 @@ const retentionMs = () => getSettings().history.retentionDays * DAY_MS
 
 const onRetentionChange = (changed) => {
   if (!changed.includes('history')) return
+  periodCache.clear()
   pruneDatabase()
 }
 
@@ -257,7 +310,10 @@ const prepareStatements = () => ({
   recentFrom: db.prepare(`SELECT ${COLUMNS} FROM samples WHERE t >= ? ORDER BY t`),
   nearestBefore: db.prepare(`SELECT ${COLUMNS} FROM samples WHERE t < ? ORDER BY t DESC LIMIT 1`),
   nearestAfter: db.prepare(`SELECT ${COLUMNS} FROM samples WHERE t > ? ORDER BY t LIMIT 1`),
-  bucketed: db.prepare(BUCKETED_ROWS)
+  bucketed: db.prepare(BUCKETED_ROWS),
+  energy: db.prepare(ENERGY_SUMS),
+  firstSoc: db.prepare(`${SOC_IN_RANGE} ORDER BY t LIMIT 1`),
+  lastSoc: db.prepare(`${SOC_IN_RANGE} ORDER BY t DESC LIMIT 1`)
 })
 
 const importLegacySnapshot = () => {
@@ -302,6 +358,7 @@ const persist = (sample) => {
 }
 
 const insertRow = (sample) => {
+  if (sample.t <= (lastTime(FULL_RANGE) ?? -Infinity)) periodCache.clear()
   const isNew = !statements.exists.get(sample.t)
   statements.insert.run(...rowValues(sample))
   if (isNew) storedRows += 1
@@ -346,6 +403,7 @@ const capMemoryOnly = () => {
   if (!memoryOnly || storedRows <= MEMORY_ONLY_MAX_SAMPLES) return
   const { changes } = statements.dropOldest.run(storedRows - MEMORY_ONLY_MAX_SAMPLES)
   storedRows -= changes
+  if (changes) periodCache.clear()
 }
 
 const registerShutdown = () => {
@@ -396,6 +454,32 @@ const BUCKETED_ROWS = `
   ) ORDER BY t`
 
 const FULL_RANGE = { from: Number.MIN_SAFE_INTEGER, before: Number.MAX_SAFE_INTEGER }
+
+const ENERGY_FIELDS = ['pvPower', 'loadPower', 'gridPower', 'batteryPower', 'smartPortPower']
+
+const ENERGY_GAP_MS = 900000
+
+const MAX_ENERGY_BOUNDS = 33
+
+const PERIOD_CACHE_LIMIT = 400
+
+const periodCache = new Map()
+
+const WATT_MS_PER_KWH = 3600000000
+
+const ENERGY_SUMS = `
+  WITH paired AS (
+    SELECT t - LAG(t) OVER pair AS dt,
+      ${ENERGY_FIELDS.join(', ')}
+    FROM samples WHERE t >= :from AND t < :before
+    WINDOW pair AS (ORDER BY t)
+  )
+  SELECT
+    ${ENERGY_FIELDS.map((field) => `SUM(CASE WHEN ${field} > 0 THEN ${field} * dt END) AS ${field}Positive,
+    SUM(CASE WHEN ${field} < 0 THEN ${field} * dt END) AS ${field}Negative`).join(',\n    ')}
+  FROM paired WHERE dt <= :gap`
+
+const SOC_IN_RANGE = 'SELECT batterySoc FROM samples WHERE t >= :from AND t < :before AND batterySoc IS NOT NULL'
 
 const MEMORY_DATABASE = ':memory:'
 

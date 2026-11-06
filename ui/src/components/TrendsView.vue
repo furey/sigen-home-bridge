@@ -3,7 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch, watchEffect } from 'vue'
 import { useStateStream } from '../composables/useStateStream.js'
 import { useHistory } from '../composables/useHistory.js'
 import { TREND_MODES, TREND_RANGES, rangeFor, useDashboardView } from '../composables/useDashboardView.js'
-import { calendarLabel, calendarTicks, calendarWindow } from '../lib/trendWindow.js'
+import { calendarLabel, calendarTicks, calendarWindow, dayBounds } from '../lib/trendWindow.js'
 import { ChevronLast, ChevronLeft, ChevronRight, Clock, History } from '@lucide/vue'
 import { useHoverCapable } from '../composables/useHoverCapable.js'
 import { useScrub } from '../composables/useScrub.js'
@@ -37,12 +37,15 @@ const anchor = ref(null)
 const historyStats = ref(null)
 const windowSamples = ref([])
 const windowSamplesKey = ref('')
+const periods = ref([])
+const periodsKey = ref('')
 const snapping = ref(false)
 
 let resizeObserver = null
 let ticker = null
 let statsTicker = null
 let windowToken = 0
+let periodsToken = 0
 let panDir = 0
 let snappedOnce = false
 
@@ -52,7 +55,10 @@ onMounted(() => {
   })
   resizeObserver.observe(stage.value)
   ticker = setInterval(() => { now.value = Date.now() }, TICK_MS)
-  statsTicker = setInterval(loadStats, STATS_INTERVAL_MS)
+  statsTicker = setInterval(() => {
+    loadStats()
+    if (barMode.value && (atLive.value || !periodsReady.value)) loadPeriods()
+  }, STATS_INTERVAL_MS)
   loadStats()
   document.addEventListener('visibilitychange', onVisibility)
   if (hoverCapable.value) window.addEventListener('keydown', onKey)
@@ -79,6 +85,7 @@ const onVisibility = () => {
   if (document.visibilityState !== 'visible') return
   loadStats()
   loadWindow()
+  loadPeriods()
 }
 
 const pollMs = computed(() => state.pollIntervalMs ?? POLL_FALLBACK_MS)
@@ -137,7 +144,9 @@ const intervalLabel = (ms) => {
 
 const legend = computed(() => legendKeys.value.map((key) => {
   const metric = metricByKey(key)
-  const tally = scrubSample.value ? pointTally(metric, key) : windowTally(metric, key)
+  const tally = scrubPeriod.value
+    ? periodTally(metric, key)
+    : scrubSample.value && !barMode.value ? pointTally(metric, key) : windowTally(metric, key)
   return {
     key,
     title: tally.direction ? `${metric.label} (${tally.direction})` : metric.label,
@@ -170,6 +179,28 @@ const pointTally = (metric, key) => {
     value: metric.format(raw),
     unit: metric.unit,
     color: accentFor(metric, raw)
+  }
+}
+
+const periodTally = (metric, key) => {
+  if (key === 'batterySoc') {
+    const { socStart, socEnd } = scrubPeriod.value
+    if (socStart == null) return emptyTally(metric)
+    const color = categoryAccentFor(metric, socEnd)
+    return { direction: '', icon: iconFor(metric, state), isArrow: false, iconColor: color, value: `${Math.round(socEnd)}`, unit: '%', color }
+  }
+  const kwh = netKwh(scrubPeriod.value, key)
+  if (!hasEnergy(scrubPeriod.value, key)) return emptyTally(metric)
+  const color = categoryAccentFor(metric, kwh * 1000)
+  const balanced = Math.abs(kwh * 1000) < BALANCED_WATTS
+  return {
+    direction: balanced ? '' : directionFor(metric, kwh * 1000),
+    icon: iconFor(metric, state),
+    isArrow: false,
+    iconColor: color,
+    value: balanced ? '0.00' : signedKwh(metric, kwh),
+    unit: 'kWh',
+    color
   }
 }
 
@@ -227,6 +258,22 @@ const windowEnd = computed(() => {
 })
 const windowStart = computed(() => calendar.value?.start ?? windowEnd.value - range.value.ms)
 const spanMs = computed(() => windowEnd.value - windowStart.value)
+const barMode = computed(() => view.mode === 'week' || view.mode === 'month')
+const bounds = computed(() => (barMode.value ? dayBounds(calendar.value) : []))
+const boundsKey = computed(() => bounds.value.join(','))
+const periodsReady = computed(() => !barMode.value || periodsKey.value === boundsKey.value)
+
+const loadPeriods = async () => {
+  if (!barMode.value) return
+  const key = boundsKey.value
+  const token = ++periodsToken
+  try {
+    const rows = await (await fetch(`/api/history/energy?bounds=${key}`)).json()
+    if (token !== periodsToken || key !== boundsKey.value || !Array.isArray(rows)) return
+    periods.value = rows
+    periodsKey.value = key
+  } catch {}
+}
 
 const atLive = computed(() => (isLive.value ? panEnd.value == null : offset.value === 0))
 const canStepEarlier = computed(() =>
@@ -269,7 +316,7 @@ watchEffect(() => {
 const everyMs = computed(() => Math.max(pollMs.value, Math.round(spanMs.value / POINT_BUDGET)))
 const liveOldestT = computed(() => samples.value.length ? samples.value[0].t : null)
 const useWindowFetch = computed(() =>
-  liveOldestT.value != null && windowStart.value < liveOldestT.value)
+  !barMode.value && liveOldestT.value != null && windowStart.value < liveOldestT.value)
 const fetchSince = computed(() => Math.floor(windowStart.value / everyMs.value) * everyMs.value)
 const fetchUntil = computed(() =>
   Math.ceil(Math.min(windowEnd.value, now.value) / everyMs.value) * everyMs.value)
@@ -281,12 +328,16 @@ const windowReady = computed(() =>
   !useWindowFetch.value || windowSamplesKey.value === fetchKey.value)
 const visible = computed(() => sliceWindow(chartSource.value))
 const ready = computed(() =>
-  size.value.width > 0 && size.value.height > 0 && visible.value.length > 1)
+  size.value.width > 0 && size.value.height > 0 && (barMode.value || visible.value.length > 1))
 const windowLabel = computed(() => (calendar.value
   ? calendarLabel({ mode: view.mode, offset: offset.value, ...calendar.value })
   : formatSpan(windowStart.value, windowEnd.value)))
 const totalsLabel = computed(() => (isLive.value ? `${range.value.label} totals` : TOTALS_LABELS[view.mode]))
+const hasChartData = computed(() => (barMode.value
+  ? periodsReady.value && periods.value.some((period) => activePowerKeys.value.some((key) => hasEnergy(period, key)))
+  : visible.value.length > 1))
 const emptyMessage = computed(() => {
+  if (barMode.value && !periodsReady.value) return 'Loading…'
   if (snapping.value) return 'No readings in this window, jumping to the nearest…'
   if (!windowReady.value) return 'Loading…'
   if (!atLive.value) return 'No readings in this window'
@@ -346,7 +397,30 @@ watch(fetchKey, () => loadWindow(), { immediate: true })
 
 const integrationGapMs = computed(() => Math.max(INTEGRATION_GAP_MS, everyMs.value * 3))
 
-const windowStats = computed(() => {
+const windowStats = computed(() => (barMode.value ? periodStats.value : sampleStats.value))
+
+const periodStats = computed(() => {
+  const list = periodsReady.value ? periods.value : []
+  const energy = {}
+  for (const key of powerKeys.value) energy[key] = periodEnergy(list, key)
+  const socs = list.filter((period) => period.socStart != null)
+  const socDelta = socs.length
+    ? Math.round(socs.at(-1).socEnd) - Math.round(socs[0].socStart)
+    : null
+  return { energy, socDelta }
+})
+
+const periodEnergy = (list, key) => {
+  const kwh = list.reduce((total, period) => total + netKwh(period, key), 0)
+  const hours = list.some((period) => hasEnergy(period, key)) ? 1 : 0
+  return { kwh, avgWatts: kwh * 1000, hours }
+}
+
+const netKwh = (period, key) => (period.energy[key]?.positive ?? 0) + (period.energy[key]?.negative ?? 0)
+
+const hasEnergy = (period, key) => Boolean(period.energy[key]?.positive || period.energy[key]?.negative)
+
+const sampleStats = computed(() => {
   const list = visible.value
   const energy = {}
   for (const key of powerKeys.value) energy[key] = integrate(list, key, integrationGapMs.value)
@@ -358,7 +432,22 @@ const inner = computed(() => ({
   height: Math.max(0, size.value.height - PAD.top - PAD.bottom)
 }))
 
-const domain = computed(() => {
+const domain = computed(() => (barMode.value ? barDomain.value : powerDomain.value))
+
+const barDomain = computed(() => {
+  let min = 0
+  let max = 0
+  for (const period of periodsReady.value ? periods.value : []) {
+    for (const key of activePowerKeys.value) {
+      max = Math.max(max, period.energy[key]?.positive ?? 0)
+      min = Math.min(min, period.energy[key]?.negative ?? 0)
+    }
+  }
+  const pad = (max - min) * 0.1 || 1
+  return { min: min < 0 ? min - pad : 0, max: max + pad }
+})
+
+const powerDomain = computed(() => {
   let min = 0
   let max = 0
   for (const sample of visible.value) {
@@ -394,7 +483,25 @@ const scrubTo = (clientX) => {
 
 const clearScrub = () => { scrubT.value = null }
 
+let pressX = null
+
+const openDay = (start) => {
+  const days = Math.round((today.value - start) / DAY_MS)
+  if (days < 0) return
+  pickMode('day')
+  anchor.value = today.value
+  offset.value = days
+}
+
+const onStageClick = (event) => {
+  if (!barMode.value || event.pointerType !== 'mouse' || !isTap(event)) return
+  if (scrubPeriod.value) openDay(scrubPeriod.value.start)
+}
+
+const isTap = (event) => pressX != null && Math.abs(event.clientX - pressX) < TAP_SLOP_PX
+
 const onPointerDown = (event) => {
+  pressX = event.clientX
   if (event.pointerType === 'mouse') return
   touchScrubbing = true
   stage.value.setPointerCapture(event.pointerId)
@@ -407,6 +514,9 @@ const onPointerMove = (event) => {
 
 const onPointerEnd = (event) => {
   if (event.pointerType === 'mouse') return
+  const tapped = event.type === 'pointerup' && isTap(event)
+  if (barMode.value && tapped && scrubPeriod.value) openDay(scrubPeriod.value.start)
+  pressX = null
   touchScrubbing = false
   clearScrub()
 }
@@ -416,7 +526,7 @@ const onPointerLeave = (event) => {
 }
 
 const scrubSample = computed(() => {
-  if (scrubT.value === null || !visible.value.length) return null
+  if (barMode.value || scrubT.value === null || !visible.value.length) return null
   return nearestSample(visible.value, scrubT.value)
 })
 
@@ -425,7 +535,7 @@ watchEffect(() => { sharedScrub.value = scrubSample.value })
 
 const scrub = computed(() => {
   const sample = scrubSample.value
-  if (!sample || !ready.value) return null
+  if (barMode.value || !sample || !ready.value) return null
   const cx = x(sample.t)
   const dots = activePowerKeys.value
     .filter((key) => Number.isFinite(sample[key]))
@@ -444,7 +554,49 @@ const scrub = computed(() => {
   return { x: cx, dots }
 })
 
+const scrubPeriod = computed(() => {
+  if (!barMode.value || scrubT.value === null || !periodsReady.value) return null
+  return periods.value.find((period) => scrubT.value >= period.start && scrubT.value < period.end) ?? null
+})
+
+const bars = computed(() => {
+  if (!barMode.value || !periodsReady.value || !ready.value) return []
+  const keys = activePowerKeys.value
+  return periods.value.map((period) => {
+    const left = x(period.start)
+    const width = x(period.end) - left
+    const barWidth = Math.max(1, (width * BAR_FILL) / Math.max(1, keys.length))
+    const first = left + (width * (1 - BAR_FILL)) / 2
+    return {
+      start: period.start,
+      highlight: scrubPeriod.value === period ? { x: left, width } : null,
+      rects: keys.flatMap((key, index) => barRects({ period, key, x: first + index * barWidth, width: barWidth }))
+    }
+  })
+})
+
+const barRects = ({ period, key, x: left, width }) => {
+  const { positive = 0, negative = 0 } = period.energy[key] ?? {}
+  const zero = zeroY.value
+  const gap = width > 3 ? 1 : 0
+  const rect = (value, sign) => {
+    const y = yPower(value)
+    return {
+      key: `${key}-${sign}`,
+      x: left + gap / 2,
+      width: width - gap,
+      y: Math.min(y, zero),
+      height: Math.abs(zero - y),
+      fill: barColor(key, sign)
+    }
+  }
+  return [positive > 0 && rect(positive, 'positive'), negative < 0 && rect(negative, 'negative')].filter(Boolean)
+}
+
+const barColor = (key, sign) => FLOW_SHADES[key]?.[sign] ?? LINE_COLORS[key]
+
 const clockLabel = computed(() => {
+  if (scrubPeriod.value) return new Date(scrubPeriod.value.start).toLocaleDateString([], PERIOD_SCRUB_FORMAT)
   const t = scrubSample.value?.t ?? now.value
   if (view.mode === 'month') return new Date(t).toLocaleString([], MONTH_SCRUB_FORMAT)
   return tickLabel(t, spanMs.value)
@@ -459,7 +611,7 @@ const segmentsFor = (key) => {
   return { segments, latest }
 }
 
-const powerSeries = computed(() => activePowerKeys.value.map((key) => {
+const powerSeries = computed(() => (barMode.value ? [] : activePowerKeys.value).map((key) => {
   const { segments, latest } = segmentsFor(key)
   return {
     key,
@@ -471,7 +623,7 @@ const powerSeries = computed(() => activePowerKeys.value.map((key) => {
 }))
 
 const socSeries = computed(() => {
-  if (!showing('batterySoc')) return null
+  if (barMode.value || !showing('batterySoc')) return null
   const { segments, latest } = segmentsFor('batterySoc')
   return {
     color: LINE_COLORS.batterySoc,
@@ -489,6 +641,7 @@ const sunDetail = computed(() =>
   Math.min(SUN_MAX_STEPS, Math.max(96, Math.round(spanMs.value / HALF_HOUR_MS))))
 
 const skyStops = computed(() => {
+  if (barMode.value) return null
   const { outdoorLatitude: latitude, outdoorLongitude: longitude } = state
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null
   return skyGradientStops({
@@ -559,10 +712,8 @@ const approxTextWidth = (text, fontSize) => text.length * fontSize * 0.68
 
 const yTicks = computed(() => {
   const { min, max } = domain.value
-  const ticks = [
-    { y: yPower(max) + Y_LABEL_BELOW, label: kw(max) },
-    { y: zeroY.value - Y_LABEL_ABOVE, label: '0' }
-  ]
+  const ticks = [{ y: yPower(max) + Y_LABEL_BELOW, label: kw(max) }]
+  if (!barMode.value) ticks.push({ y: zeroY.value - Y_LABEL_ABOVE, label: '0' })
   if (min < 0) ticks.push({ y: yPower(min) - Y_LABEL_ABOVE, label: kw(min) })
   return ticks
 })
@@ -682,7 +833,9 @@ const tickLabel = (t, rangeMs) => {
   return at.toLocaleDateString([], { day: 'numeric', month: 'short' })
 }
 
-const kw = (watts) => formatPower(watts, { signed: true })
+const kw = (value) => (barMode.value ? kwhLabel(value) : formatPower(value, { signed: true }))
+
+const kwhLabel = (kwh) => `${kwh < 0 ? '-' : ''}${Math.abs(kwh).toFixed(Math.abs(kwh) >= 10 ? 0 : 1)} kWh`
 
 const integrate = (samples, key, gapMs = INTEGRATION_GAP_MS) => {
   let kwh = 0
@@ -749,6 +902,12 @@ const CALENDAR_MODES = TREND_MODES.filter((mode) => mode.key !== 'live').map((mo
 
 const TOTALS_LABELS = { day: 'Day totals', week: 'Week totals', month: 'Month totals' }
 
+const BAR_FILL = 0.8
+
+const TAP_SLOP_PX = 8
+
+const PERIOD_SCRUB_FORMAT = { weekday: 'short', day: 'numeric', month: 'short' }
+
 const MONTH_SCRUB_FORMAT = { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }
 
 const TICK_FRACTIONS = [0, 1 / 3, 2 / 3, 1]
@@ -792,6 +951,8 @@ const SKY_MAX_STOPS = 384
 const SUN_MAX_STEPS = 512
 
 const STATS_INTERVAL_MS = 60000
+
+watch(boundsKey, () => loadPeriods(), { immediate: true })
 
 watch([() => visible.value.length, windowReady, () => panEnd.value], () => {
   if (panEnd.value == null || panDir === 0) { snapping.value = false; return }
@@ -917,6 +1078,8 @@ watch([() => visible.value.length, windowReady, () => panEnd.value], () => {
       @pointerup="onPointerEnd"
       @pointercancel="onPointerEnd"
       @pointerleave="onPointerLeave"
+      @click="onStageClick"
+      :class="{ 'cursor-pointer': barMode }"
     >
       <svg v-if="ready" :width="size.width" :height="size.height" class="absolute inset-0">
         <defs>
@@ -968,6 +1131,22 @@ watch([() => visible.value.length, windowReady, () => panEnd.value], () => {
           :width="inner.width" :height="inner.height"
           fill="url(#sky-tint)" mask="url(#sky-mask)"
         />
+        <g v-if="bars.length" clip-path="url(#trends-plot)">
+          <template v-for="bar in bars" :key="`bar-${bar.start}`">
+            <rect
+              v-if="bar.highlight"
+              :x="bar.highlight.x" :y="PAD.top"
+              :width="bar.highlight.width" :height="inner.height"
+              fill="#f4f4f5" fill-opacity="0.06"
+            />
+            <rect
+              v-for="rect in bar.rects"
+              :key="rect.key"
+              :x="rect.x" :y="rect.y" :width="rect.width" :height="rect.height"
+              :fill="rect.fill" rx="1"
+            />
+          </template>
+        </g>
         <g v-if="socSeries" clip-path="url(#trends-plot)">
           <path :d="socSeries.area" :fill="socSeries.color" fill-opacity="0.08" />
           <path :d="socSeries.line" :stroke="socSeries.color" stroke-opacity="0.35" stroke-width="1.5" fill="none" />
@@ -1038,7 +1217,7 @@ watch([() => visible.value.length, windowReady, () => panEnd.value], () => {
         </text>
       </svg>
       <p
-        v-if="size.width > 0 && visible.length < 2"
+        v-if="size.width > 0 && !hasChartData"
         class="absolute inset-0 flex items-center justify-center text-sm text-zinc-500"
       >
         {{ emptyMessage }}
