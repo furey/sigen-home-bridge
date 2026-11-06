@@ -38,10 +38,13 @@ The **Trends** switch in the lower left swaps the panels for a chart of every re
 - **Scrub back in time.** Hover with a mouse, or press and drag on a touch screen. A cursor line snaps to the nearest reading and the legend, the clock, and the header temperature switch to that moment.
 - **Read the sky.** The chart tints itself by the sun's height across the window, using your weather location, with sunrise and sunset marked on the axis. No internet calls; it's all worked out on the spot.
 - **Solo a line.** Tap a reading in the legend to show just that one. Tap it again to bring them all back.
-- **Pick a window.** Pills in the top right run from the last minute up to your full history. Wider windows appear as your stored history grows.
-- **Step through history.** Buttons below the chart (and the arrow keys on a keyboard) walk the window back through your history and snap back to now.
+- **Pick a period.** A control in the top right switches between Now, Day, Week, and Month. Now shows a rolling window (1 minute to 6 hours; the short ones grey out when polling is slow). Day is one calendar day, Week is the last 7 days, and Month is one calendar month.
+- **Step through history.** In Now, buttons below the chart walk the window back and forward, and Now returns to the live edge. In Day, Week, and Month, the arrows step a whole period and Now returns to the current one. On a keyboard, left and right step, and up and down move through the periods.
+- **See daily energy.** Week and Month show one bar per day in kWh, up for import and charge, down for export and discharge. Scrub a bar to read that day, or tap it to open the day.
+- **Split into lanes.** The icons beside the totals switch between Combined and Lanes. Lanes gives each series its own chart and scale, with a shared scrub line.
+- **Rotate your phone.** In landscape on a touch phone, the page header and footer hide on Trends so the chart gets the height.
 
-Your history survives restarts; it's kept in a small database on the host. How far back the chart can reach is set under **Settings → History**, where you can also download the readings as CSV or JSON, at full detail or thinned to one row a minute.
+Your history survives restarts; it's kept in a small database on the host. The chart remembers your period, layout, and hidden lines. How far back it can reach (31 to 90 days) is set under **Settings → History**, where you can also download the readings as CSV or JSON, at full detail or thinned to one row a minute.
 
 ## Colours and theming
 

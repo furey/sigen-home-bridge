@@ -4,7 +4,7 @@ import { SETTINGS_SECTIONS } from './sections.js'
 </script>
 
 <template>
-  <nav class="flex flex-col gap-2 md:hidden">
+  <nav class="flex flex-col gap-0.5 sm:gap-2 md:hidden">
     <RouterLink
       v-for="section in SETTINGS_SECTIONS"
       :key="section.name"

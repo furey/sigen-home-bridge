@@ -53,6 +53,7 @@ The signs carry meaning: `grid` is positive when you're importing and negative w
 ## History
 
 - `GET /api/history` returns the recent readings behind the trends chart.
+- `GET /api/history/energy?bounds=…` returns kWh totals for each period between the times you give it, the same figures behind the Week and Month bars.
 - `GET /api/history/export?format=json&every=300` returns your full stored history, thinned to one row every 300 seconds. Swap `format=csv` for a spreadsheet.
 
 ::: warning Keep it on your network
