@@ -1099,7 +1099,7 @@ watch([() => visible.value.length, windowReady, () => panEnd.value], () => {
 </script>
 
 <template>
-  <section class="flex flex-col gap-3 rounded-2xl phone-bleed bg-zinc-900 p-4 ring-1 ring-zinc-800 sm:p-5">
+  <section class="trends-section flex flex-col gap-3 rounded-2xl phone-bleed bg-zinc-900 p-4 ring-1 ring-zinc-800 sm:p-5">
     <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
       <div
         class="flex w-full gap-0.5 rounded-xl bg-zinc-950/60 p-1 ring-1 ring-zinc-800 sm:w-auto"
@@ -1171,11 +1171,11 @@ watch([() => visible.value.length, windowReady, () => panEnd.value], () => {
       </div>
     </div>
 
-    <div class="flex flex-col gap-2">
+    <div class="trends-readout flex flex-col gap-2">
       <div class="flex items-center justify-between gap-3">
         <span
           class="flex items-center gap-1.5 tabular-nums transition-colors"
-          :class="scrubSample || scrubPeriod ? 'text-zinc-100' : 'text-zinc-500'"
+          :class="scrubSample || scrubPeriod ? 'text-zinc-100' : 'trends-readout-idle text-zinc-500'"
           :title="scrubSample || scrubPeriod
             ? 'Values at this point in time'
             : 'Totals across this window; hover or drag the chart to read a point'"
@@ -1200,7 +1200,7 @@ watch([() => visible.value.length, windowReady, () => panEnd.value], () => {
           </button>
         </div>
       </div>
-      <div class="grid grid-cols-3 gap-x-3 gap-y-2.5 sm:flex sm:flex-wrap sm:gap-x-5">
+      <div class="trends-legend grid grid-cols-3 gap-x-3 gap-y-2.5 sm:flex sm:flex-wrap sm:gap-x-5">
         <button
           v-for="item in legend"
           :key="item.key"
@@ -1502,3 +1502,41 @@ watch([() => visible.value.length, windowReady, () => panEnd.value], () => {
     </div>
   </section>
 </template>
+
+<style scoped>
+@media (orientation: landscape) and (max-height: 480px) and (hover: none) and (pointer: coarse) {
+  .trends-section {
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+  }
+
+  .trends-readout {
+    flex-direction: row-reverse;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .trends-readout-idle {
+    display: none;
+  }
+
+  .trends-legend {
+    display: flex;
+    flex: 1 1 auto;
+    flex-wrap: nowrap;
+    column-gap: 0.875rem;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .trends-legend > button {
+    flex: none;
+  }
+
+  .trends-legend .text-base {
+    font-size: 0.875rem;
+  }
+}
+</style>

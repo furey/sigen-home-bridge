@@ -123,7 +123,10 @@ const lastUpdated = computed(() =>
 </script>
 
 <template>
-  <main class="flex flex-col gap-3 min-h-app p-safe sm:gap-4">
+  <main
+    class="flex flex-col gap-3 min-h-app p-safe sm:gap-4"
+    :class="{ 'trends-page': trendsActive }"
+  >
     <header class="grid items-center grid-cols-3">
       <div class="flex items-center gap-1 text-sm text-zinc-300">
         <span
@@ -490,6 +493,18 @@ const lastUpdated = computed(() =>
 
   .dual-cell .metric-unit {
     font-size: calc(var(--metric-fluid-battery) * 0.28);
+  }
+}
+
+@media (orientation: landscape) and (max-height: 480px) and (hover: none) and (pointer: coarse) {
+  .trends-page {
+    padding-top: max(0.5rem, env(safe-area-inset-top));
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+
+  .trends-page > header,
+  .trends-page > footer {
+    display: none;
   }
 }
 
