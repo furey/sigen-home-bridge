@@ -4,7 +4,7 @@ import { useStateStream } from '../composables/useStateStream.js'
 import { useHistory } from '../composables/useHistory.js'
 import { TREND_MODES, TREND_RANGES, rangeFor, useDashboardView } from '../composables/useDashboardView.js'
 import { calendarLabel, calendarTicks, calendarWindow, dayBounds } from '../lib/trendWindow.js'
-import { ChevronLast, ChevronLeft, ChevronRight, Clock, History } from '@lucide/vue'
+import { ChartLine, ChevronLast, ChevronLeft, ChevronRight, Clock, History, Rows3 } from '@lucide/vue'
 import { useHoverCapable } from '../composables/useHoverCapable.js'
 import { useScrub } from '../composables/useScrub.js'
 import { useSettings } from '../composables/useSettings.js'
@@ -17,7 +17,7 @@ import { skyGradientStops, sunCrossings } from '../lib/sun.js'
 
 const { state } = useStateStream()
 const { samples } = useHistory()
-const { view, setRange, setMode, toggleMetric } = useDashboardView()
+const { view, setRange, setMode, setLayout, toggleMetric } = useDashboardView()
 const { data: settings } = useSettings()
 const hoverCapable = useHoverCapable()
 
@@ -259,6 +259,10 @@ const windowEnd = computed(() => {
 const windowStart = computed(() => calendar.value?.start ?? windowEnd.value - range.value.ms)
 const spanMs = computed(() => windowEnd.value - windowStart.value)
 const barMode = computed(() => view.mode === 'week' || view.mode === 'month')
+const lanesMode = computed(() => view.layout === 'lanes')
+const stageHeightClass = computed(() => (lanesMode.value
+  ? 'max-sm:min-h-[100vw]'
+  : 'max-sm:max-h-[100vw] max-sm:min-h-[72vw]'))
 const bounds = computed(() => (barMode.value ? dayBounds(calendar.value) : []))
 const boundsKey = computed(() => bounds.value.join(','))
 const periodsReady = computed(() => !barMode.value || periodsKey.value === boundsKey.value)
@@ -595,6 +599,121 @@ const barRects = ({ period, key, x: left, width }) => {
 
 const barColor = (key, sign) => FLOW_SHADES[key]?.[sign] ?? LINE_COLORS[key]
 
+const laneKeys = computed(() => [...activePowerKeys.value, ...(showing('batterySoc') ? ['batterySoc'] : [])])
+
+const lanes = computed(() => {
+  if (!lanesMode.value || !ready.value) return []
+  const keys = laneKeys.value
+  const height = (inner.value.height - LANE_GAP * (keys.length - 1)) / Math.max(1, keys.length)
+  if (height < LANE_LABEL_HEIGHT + LANE_MIN_PLOT) return []
+  return keys.map((key, index) => {
+    const top = PAD.top + index * (height + LANE_GAP)
+    return barMode.value ? barLane({ key, top, height }) : lineLane({ key, top, height })
+  })
+})
+
+const laneScrubDots = computed(() => {
+  const sample = scrubSample.value
+  if (!sample || !lanesMode.value) return []
+  return lanes.value
+    .filter((lane) => Number.isFinite(sample[lane.key]))
+    .map((lane) => ({
+      key: lane.key,
+      cy: lane.scale(sample[lane.key]),
+      color: accentFor(metricByKey(lane.key), sample[lane.key])
+    }))
+})
+
+const laneHighlight = computed(() => {
+  if (!lanesMode.value || !scrubPeriod.value) return null
+  const left = x(scrubPeriod.value.start)
+  return { x: left, width: x(scrubPeriod.value.end) - left }
+})
+
+const laneScale = ({ top, height, min, max }) => (value) =>
+  top + (1 - (value - min) / (max - min || 1)) * height
+
+const paddedDomain = (values, fallbackPad) => {
+  const min = Math.min(0, ...values)
+  const max = Math.max(0, ...values)
+  const pad = (max - min) * 0.1 || fallbackPad
+  return { min: min < 0 ? min - pad : 0, max: max + pad }
+}
+
+const lineLane = ({ key, top: laneTop, height: laneHeight }) => {
+  const top = laneTop + LANE_LABEL_HEIGHT
+  const height = laneHeight - LANE_LABEL_HEIGHT
+  const { segments } = segmentsFor(key)
+  const isSoc = key === 'batterySoc'
+  const values = segments.flat().map((point) => point.v)
+  const domain = isSoc ? { min: 0, max: 100 } : paddedDomain(values, LINE_FALLBACK_PAD)
+  const y = laneScale({ top, height, ...domain })
+  const zero = y(0)
+  return {
+    key,
+    top,
+    height,
+    labelY: laneTop + LANE_LABEL_BASELINE,
+    label: laneLabel(key, Math.max(0, ...values)),
+    scale: y,
+    zeroY: isSoc ? null : zero,
+    stroke: FLOW_SHADES[key] ? `url(#lane-${key})` : LINE_COLORS[key],
+    gradient: FLOW_SHADES[key] ? { ...FLOW_SHADES[key], fraction: Math.min(1, Math.max(0, (zero - top) / height)) } : null,
+    path: linePath(segments, x, y),
+    area: isSoc ? areaPath(segments, x, y, top + height) : null,
+    rects: []
+  }
+}
+
+const barLane = ({ key, top: laneTop, height: laneHeight }) => {
+  const top = laneTop + LANE_LABEL_HEIGHT
+  const height = laneHeight - LANE_LABEL_HEIGHT
+  const list = periodsReady.value ? periods.value : []
+  const isSoc = key === 'batterySoc'
+  const values = list.flatMap((period) => (isSoc
+    ? [period.socEnd ?? 0]
+    : [period.energy[key]?.positive ?? 0, period.energy[key]?.negative ?? 0]))
+  const domain = isSoc ? { min: 0, max: 100 } : paddedDomain(values, BAR_FALLBACK_PAD)
+  const y = laneScale({ top, height, ...domain })
+  const zero = y(0)
+  const rects = list.flatMap((period) => {
+    const left = x(period.start)
+    const width = (x(period.end) - left) * BAR_FILL
+    const barX = left + (x(period.end) - left - width) / 2
+    const parts = isSoc
+      ? [[period.socEnd ?? 0, 'positive']]
+      : [[period.energy[key]?.positive ?? 0, 'positive'], [period.energy[key]?.negative ?? 0, 'negative']]
+    return parts.filter(([value]) => value !== 0).map(([value, sign]) => ({
+      key: `${key}-${period.start}-${sign}`,
+      x: barX,
+      width,
+      y: Math.min(y(value), zero),
+      height: Math.abs(zero - y(value)),
+      fill: isSoc ? LINE_COLORS.batterySoc : barColor(key, sign)
+    }))
+  })
+  return {
+    key,
+    top,
+    height,
+    labelY: laneTop + LANE_LABEL_BASELINE,
+    label: laneLabel(key, Math.max(0, ...values)),
+    scale: y,
+    zeroY: isSoc ? null : zero,
+    rects,
+    path: '',
+    area: null,
+    gradient: null
+  }
+}
+
+const laneLabel = (key, max) => `${metricByKey(key).label} · ${laneMax(key, max)}`
+
+const laneMax = (key, max) => {
+  if (key === 'batterySoc') return '100%'
+  return barMode.value ? kwhLabel(max) : `${formatPower(max)} kW`
+}
+
 const clockLabel = computed(() => {
   if (scrubPeriod.value) return new Date(scrubPeriod.value.start).toLocaleDateString([], PERIOD_SCRUB_FORMAT)
   const t = scrubSample.value?.t ?? now.value
@@ -904,6 +1023,23 @@ const TOTALS_LABELS = { day: 'Day totals', week: 'Week totals', month: 'Month to
 
 const BAR_FILL = 0.8
 
+const LANE_GAP = 8
+
+const LANE_LABEL_HEIGHT = 16
+
+const LANE_LABEL_BASELINE = 11
+
+const LANE_MIN_PLOT = 12
+
+const LINE_FALLBACK_PAD = 500
+
+const BAR_FALLBACK_PAD = 1
+
+const LAYOUT_OPTIONS = [
+  { key: 'combined', label: 'Combined', icon: ChartLine },
+  { key: 'lanes', label: 'Lanes', icon: Rows3 }
+]
+
 const TAP_SLOP_PX = 8
 
 const PERIOD_SCRUB_FORMAT = { weekday: 'short', day: 'numeric', month: 'short' }
@@ -1036,18 +1172,34 @@ watch([() => visible.value.length, windowReady, () => panEnd.value], () => {
     </div>
 
     <div class="flex flex-col gap-2">
-      <span
-        class="flex items-center gap-1.5 tabular-nums transition-colors"
-        :class="scrubSample ? 'text-zinc-100' : 'text-zinc-500'"
-        :title="scrubSample
-          ? 'Values at this point in time'
-          : 'Totals across this window; hover or drag the chart to read a point'"
-      >
-        <Clock v-if="scrubSample" class="h-4 w-4" />
-        <span class="text-xs font-semibold uppercase tracking-wide leading-none">
-          {{ scrubSample ? clockLabel : totalsLabel }}
+      <div class="flex items-center justify-between gap-3">
+        <span
+          class="flex items-center gap-1.5 tabular-nums transition-colors"
+          :class="scrubSample || scrubPeriod ? 'text-zinc-100' : 'text-zinc-500'"
+          :title="scrubSample || scrubPeriod
+            ? 'Values at this point in time'
+            : 'Totals across this window; hover or drag the chart to read a point'"
+        >
+          <Clock v-if="scrubSample || scrubPeriod" class="h-4 w-4" />
+          <span class="text-xs font-semibold uppercase tracking-wide leading-none">
+            {{ scrubSample || scrubPeriod ? clockLabel : totalsLabel }}
+          </span>
         </span>
-      </span>
+        <div class="flex gap-0.5 rounded-lg bg-zinc-950/60 p-0.5 ring-1 ring-zinc-800" role="group" aria-label="Chart layout">
+          <button
+            v-for="option in LAYOUT_OPTIONS"
+            :key="option.key"
+            class="grid h-9 w-11 place-items-center rounded-md transition"
+            :class="view.layout === option.key ? 'bg-zinc-700 text-zinc-50' : 'text-zinc-400 hover:text-zinc-200'"
+            :aria-pressed="view.layout === option.key"
+            :aria-label="option.label"
+            :title="option.label"
+            @click="setLayout(option.key)"
+          >
+            <component :is="option.icon" class="h-4 w-4" />
+          </button>
+        </div>
+      </div>
       <div class="grid grid-cols-3 gap-x-3 gap-y-2.5 sm:flex sm:flex-wrap sm:gap-x-5">
         <button
           v-for="item in legend"
@@ -1072,14 +1224,14 @@ watch([() => visible.value.length, windowReady, () => panEnd.value], () => {
 
     <div
       ref="stage"
-      class="relative min-h-0 flex-1 touch-none select-none max-sm:-mx-4 max-sm:max-h-[100vw] max-sm:min-h-[72vw]"
+      class="relative min-h-0 flex-1 touch-none select-none max-sm:-mx-4"
       @pointerdown="onPointerDown"
       @pointermove="onPointerMove"
       @pointerup="onPointerEnd"
       @pointercancel="onPointerEnd"
       @pointerleave="onPointerLeave"
       @click="onStageClick"
-      :class="{ 'cursor-pointer': barMode }"
+      :class="[stageHeightClass, { 'cursor-pointer': barMode }]"
     >
       <svg v-if="ready" :width="size.width" :height="size.height" class="absolute inset-0">
         <defs>
@@ -1124,6 +1276,18 @@ watch([() => visible.value.length, windowReady, () => panEnd.value], () => {
             <stop :offset="gradient.fraction" :stop-color="gradient.negative" />
             <stop offset="1" :stop-color="gradient.negative" />
           </linearGradient>
+          <linearGradient
+            v-for="lane in lanes.filter((entry) => entry.gradient)"
+            :id="`lane-${lane.key}`"
+            :key="`lane-gradient-${lane.key}`"
+            gradientUnits="userSpaceOnUse"
+            :x1="0" :y1="lane.top" :x2="0" :y2="lane.top + lane.height"
+          >
+            <stop offset="0" :stop-color="lane.gradient.positive" />
+            <stop :offset="lane.gradient.fraction" :stop-color="lane.gradient.positive" />
+            <stop :offset="lane.gradient.fraction" :stop-color="lane.gradient.negative" />
+            <stop offset="1" :stop-color="lane.gradient.negative" />
+          </linearGradient>
         </defs>
         <rect
           v-if="skyStops"
@@ -1131,73 +1295,120 @@ watch([() => visible.value.length, windowReady, () => panEnd.value], () => {
           :width="inner.width" :height="inner.height"
           fill="url(#sky-tint)" mask="url(#sky-mask)"
         />
-        <g v-if="bars.length" clip-path="url(#trends-plot)">
-          <template v-for="bar in bars" :key="`bar-${bar.start}`">
-            <rect
-              v-if="bar.highlight"
-              :x="bar.highlight.x" :y="PAD.top"
-              :width="bar.highlight.width" :height="inner.height"
-              fill="#f4f4f5" fill-opacity="0.06"
+        <template v-if="!lanesMode">
+          <g v-if="bars.length" clip-path="url(#trends-plot)">
+            <template v-for="bar in bars" :key="`bar-${bar.start}`">
+              <rect
+                v-if="bar.highlight"
+                :x="bar.highlight.x" :y="PAD.top"
+                :width="bar.highlight.width" :height="inner.height"
+                fill="#f4f4f5" fill-opacity="0.06"
+              />
+              <rect
+                v-for="rect in bar.rects"
+                :key="rect.key"
+                :x="rect.x" :y="rect.y" :width="rect.width" :height="rect.height"
+                :fill="rect.fill" rx="1"
+              />
+            </template>
+          </g>
+          <g v-if="socSeries" clip-path="url(#trends-plot)">
+            <path :d="socSeries.area" :fill="socSeries.color" fill-opacity="0.08" />
+            <path :d="socSeries.line" :stroke="socSeries.color" stroke-opacity="0.35" stroke-width="1.5" fill="none" />
+          </g>
+          <line
+            :x1="PAD.left" :x2="rightEdge" :y1="zeroY" :y2="zeroY"
+            stroke="#3f3f46" stroke-dasharray="4 4" stroke-width="1"
+          />
+          <g clip-path="url(#trends-plot)">
+            <path
+              v-for="series in powerSeries"
+              :key="series.key"
+              :d="series.path"
+              :stroke="series.stroke"
+              :stroke-width="strokeWidth"
+              stroke-linejoin="round"
+              stroke-linecap="round"
+              fill="none"
+            />
+            <circle
+              v-if="socSeries?.dot"
+              :cx="socSeries.dot.cx" :cy="socSeries.dot.cy" r="2.5"
+              :fill="socSeries.dotColor" fill-opacity="0.5"
+            />
+            <circle
+              v-for="series in powerSeries.filter((entry) => entry.dot)"
+              :key="`dot-${series.key}`"
+              :cx="series.dot.cx" :cy="series.dot.cy" r="3"
+              :fill="series.dotColor"
+            />
+            <template v-if="scrub">
+              <line
+                :x1="scrub.x" :x2="scrub.x" :y1="PAD.top" :y2="baselineY"
+                stroke="#f4f4f5" stroke-opacity="0.5" stroke-width="1"
+              />
+              <circle
+                v-for="dot in scrub.dots"
+                :key="`scrub-${dot.key}`"
+                :cx="scrub.x" :cy="dot.cy" r="3"
+                :fill="dot.color"
+              />
+            </template>
+          </g>
+          <text
+            v-for="tick in yTicks"
+            :key="`y-${tick.label}`"
+            :x="PAD.left + 2" :y="tick.y"
+            text-anchor="start" class="fill-zinc-500 text-[10px] tabular-nums"
+          >
+            {{ tick.label }}
+          </text>
+        </template>
+        <g v-else clip-path="url(#trends-plot)">
+          <rect
+            v-if="laneHighlight"
+            :x="laneHighlight.x" :y="PAD.top"
+            :width="laneHighlight.width" :height="inner.height"
+            fill="#f4f4f5" fill-opacity="0.06"
+          />
+          <g v-for="lane in lanes" :key="`lane-${lane.key}`">
+            <path v-if="lane.area" :d="lane.area" :fill="LINE_COLORS.batterySoc" fill-opacity="0.12" />
+            <line
+              v-if="lane.zeroY != null"
+              :x1="PAD.left" :x2="rightEdge" :y1="lane.zeroY" :y2="lane.zeroY"
+              stroke="#3f3f46" stroke-dasharray="4 4" stroke-width="1"
             />
             <rect
-              v-for="rect in bar.rects"
+              v-for="rect in lane.rects"
               :key="rect.key"
               :x="rect.x" :y="rect.y" :width="rect.width" :height="rect.height"
               :fill="rect.fill" rx="1"
             />
-          </template>
-        </g>
-        <g v-if="socSeries" clip-path="url(#trends-plot)">
-          <path :d="socSeries.area" :fill="socSeries.color" fill-opacity="0.08" />
-          <path :d="socSeries.line" :stroke="socSeries.color" stroke-opacity="0.35" stroke-width="1.5" fill="none" />
-        </g>
-        <line
-          :x1="PAD.left" :x2="rightEdge" :y1="zeroY" :y2="zeroY"
-          stroke="#3f3f46" stroke-dasharray="4 4" stroke-width="1"
-        />
-        <g clip-path="url(#trends-plot)">
-          <path
-            v-for="series in powerSeries"
-            :key="series.key"
-            :d="series.path"
-            :stroke="series.stroke"
-            :stroke-width="strokeWidth"
-            stroke-linejoin="round"
-            stroke-linecap="round"
-            fill="none"
-          />
-          <circle
-            v-if="socSeries?.dot"
-            :cx="socSeries.dot.cx" :cy="socSeries.dot.cy" r="2.5"
-            :fill="socSeries.dotColor" fill-opacity="0.5"
-          />
-          <circle
-            v-for="series in powerSeries.filter((entry) => entry.dot)"
-            :key="`dot-${series.key}`"
-            :cx="series.dot.cx" :cy="series.dot.cy" r="3"
-            :fill="series.dotColor"
-          />
-          <template v-if="scrub">
-            <line
-              :x1="scrub.x" :x2="scrub.x" :y1="PAD.top" :y2="baselineY"
-              stroke="#f4f4f5" stroke-opacity="0.5" stroke-width="1"
+            <path
+              v-if="lane.path"
+              :d="lane.path"
+              :stroke="lane.stroke"
+              :stroke-width="strokeWidth"
+              stroke-linejoin="round"
+              stroke-linecap="round"
+              fill="none"
             />
-            <circle
-              v-for="dot in scrub.dots"
-              :key="`scrub-${dot.key}`"
-              :cx="scrub.x" :cy="dot.cy" r="3"
-              :fill="dot.color"
-            />
-          </template>
+            <text :x="PAD.left + 2" :y="lane.labelY" class="fill-zinc-500 text-[10px] tabular-nums">
+              {{ lane.label }}
+            </text>
+          </g>
+          <circle
+            v-for="dot in scrub ? laneScrubDots : []"
+            :key="`lane-scrub-${dot.key}`"
+            :cx="scrub.x" :cy="dot.cy" r="3"
+            :fill="dot.color"
+          />
+          <line
+            v-if="scrub"
+            :x1="scrub.x" :x2="scrub.x" :y1="PAD.top" :y2="baselineY"
+            stroke="#f4f4f5" stroke-opacity="0.5" stroke-width="1"
+          />
         </g>
-        <text
-          v-for="tick in yTicks"
-          :key="`y-${tick.label}`"
-          :x="PAD.left + 2" :y="tick.y"
-          text-anchor="start" class="fill-zinc-500 text-[10px] tabular-nums"
-        >
-          {{ tick.label }}
-        </text>
         <text
           v-for="tick in xTicks"
           :key="`x-${tick.t}`"

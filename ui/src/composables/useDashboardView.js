@@ -28,6 +28,7 @@ const createStore = () => {
 
   const setRange = (key) => { view.range = key }
   const setMode = (key) => { view.mode = key }
+  const setLayout = (key) => { view.layout = key }
   const toggleMetric = (key) => {
     if (view.hidden.length === 0) {
       view.hidden = METRIC_KEYS.filter((entry) => entry !== key)
@@ -43,7 +44,7 @@ const createStore = () => {
       ? view.hidden.filter((entry) => entry !== key)
       : [...view.hidden, key]
   }
-  return { view, setRange, setMode, toggleMetric }
+  return { view, setRange, setMode, setLayout, toggleMetric }
 }
 
 export const rangeFor = (key) => TREND_RANGES[Math.max(0, rangeIndex(key))]
@@ -54,7 +55,9 @@ const METRIC_KEYS = METRICS.map((metric) => metric.key)
 
 const STORAGE_KEY = 'sigenDashboardView'
 
-const DEFAULTS = { trends: false, mode: 'live', range: '1h', hidden: [] }
+const DEFAULTS = { trends: false, mode: 'live', layout: 'combined', range: '1h', hidden: [] }
+
+const LAYOUTS = ['combined', 'lanes']
 
 const LEGACY_RANGE_MODES = { '24h': 'day', '2d': 'week', '7d': 'week', '14d': 'week', '30d': 'month', '90d': 'month' }
 
@@ -73,6 +76,7 @@ const restore = () => {
     return {
       trends: Boolean(saved.trends),
       mode: restoredMode(saved),
+      layout: LAYOUTS.includes(saved.layout) ? saved.layout : DEFAULTS.layout,
       range: rangeIndex(saved.range) >= 0 ? saved.range : DEFAULTS.range,
       hidden: Array.isArray(saved.hidden)
         ? saved.hidden.filter((key) => typeof key === 'string')
