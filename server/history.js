@@ -184,7 +184,7 @@ const keepRecent = () => {
 
 const firstFresh = () => {
   if (!recent.length) return 0
-  const cutoff = recent.at(-1).t - recentWindowMs()
+  const cutoff = recent.at(-1).t - RECENT_WINDOW_MS
   let index = recentStart
   while (index < recent.length && recent[index].t < cutoff) index += 1
   return index
@@ -196,13 +196,10 @@ const compactRecent = () => {
   return recent
 }
 
-const recentWindowMs = () => Math.min(retentionMs(), RECENT_WINDOW_MS)
-
 const retentionMs = () => getSettings().history.retentionDays * DAY_MS
 
 const onRetentionChange = (changed) => {
   if (!changed.includes('history')) return
-  keepRecent()
   pruneDatabase()
 }
 
@@ -277,7 +274,7 @@ const loadRecent = () => {
   const newest = lastTime(FULL_RANGE)
   if (newest == null) return []
   log(`restored ${historyStats().count} samples`)
-  return statements.recentFrom.all(newest - recentWindowMs())
+  return statements.recentFrom.all(newest - RECENT_WINDOW_MS)
 }
 
 const persist = (sample) => {
