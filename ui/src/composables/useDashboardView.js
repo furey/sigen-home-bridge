@@ -6,7 +6,8 @@ export const TREND_RANGES = [
   { key: '5m', label: '5m', ms: 300000 },
   { key: '15m', label: '15m', ms: 900000 },
   { key: '1h', label: '1h', ms: 3600000 },
-  { key: '6h', label: '6h', ms: 21600000 }
+  { key: '6h', label: '6h', ms: 21600000 },
+  { key: '24h', label: '24h', ms: 86400000 }
 ]
 
 export const TREND_MODES = [

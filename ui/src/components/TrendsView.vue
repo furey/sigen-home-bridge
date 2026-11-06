@@ -605,10 +605,11 @@ const lanes = computed(() => {
   if (!lanesMode.value || !ready.value) return []
   const keys = laneKeys.value
   const height = (inner.value.height - LANE_GAP * (keys.length - 1)) / Math.max(1, keys.length)
-  if (height < LANE_LABEL_HEIGHT + LANE_MIN_PLOT) return []
+  if (height < LANE_MIN_PLOT) return []
+  const band = height >= LANE_LABEL_HEIGHT + LANE_COMFORT_PLOT ? LANE_LABEL_HEIGHT : 0
   return keys.map((key, index) => {
     const top = PAD.top + index * (height + LANE_GAP)
-    return barMode.value ? barLane({ key, top, height }) : lineLane({ key, top, height })
+    return barMode.value ? barLane({ key, top, height, band }) : lineLane({ key, top, height, band })
   })
 })
 
@@ -640,9 +641,9 @@ const paddedDomain = (values, fallbackPad) => {
   return { min: min < 0 ? min - pad : 0, max: max + pad }
 }
 
-const lineLane = ({ key, top: laneTop, height: laneHeight }) => {
-  const top = laneTop + LANE_LABEL_HEIGHT
-  const height = laneHeight - LANE_LABEL_HEIGHT
+const lineLane = ({ key, top: laneTop, height: laneHeight, band }) => {
+  const top = laneTop + band
+  const height = laneHeight - band
   const { segments } = segmentsFor(key)
   const isSoc = key === 'batterySoc'
   const values = segments.flat().map((point) => point.v)
@@ -665,9 +666,9 @@ const lineLane = ({ key, top: laneTop, height: laneHeight }) => {
   }
 }
 
-const barLane = ({ key, top: laneTop, height: laneHeight }) => {
-  const top = laneTop + LANE_LABEL_HEIGHT
-  const height = laneHeight - LANE_LABEL_HEIGHT
+const barLane = ({ key, top: laneTop, height: laneHeight, band }) => {
+  const top = laneTop + band
+  const height = laneHeight - band
   const list = periodsReady.value ? periods.value : []
   const isSoc = key === 'batterySoc'
   const values = list.flatMap((period) => (isSoc
@@ -1030,6 +1031,8 @@ const LANE_LABEL_HEIGHT = 16
 const LANE_LABEL_BASELINE = 11
 
 const LANE_MIN_PLOT = 12
+
+const LANE_COMFORT_PLOT = 24
 
 const LINE_FALLBACK_PAD = 500
 
