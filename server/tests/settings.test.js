@@ -189,11 +189,15 @@ describe('tariff', () => {
 
 describe('history', () => {
   it('seeds the default retention window', () => {
-    expect(loadSettings().history.retentionDays).toBe(7)
+    expect(loadSettings().history.retentionDays).toBe(31)
   })
 
   it('persists a custom retention window', () => {
-    expect(updateSettings({ history: { retentionDays: 30 } }).history.retentionDays).toBe(30)
+    expect(updateSettings({ history: { retentionDays: 45 } }).history.retentionDays).toBe(45)
+  })
+
+  it('lifts a retention window shorter than a month to 31 days', () => {
+    expect(updateSettings({ history: { retentionDays: 7 } }).history.retentionDays).toBe(31)
   })
 
   it('rejects a zero retention window', () => {
@@ -767,7 +771,7 @@ describe('settings file integrity', () => {
     expect(settings.setupComplete).toBe(true)
     expect(settings.security.passcode).toEqual({ hash: 'abcd1234', salt: 'beef' })
     expect(settings.battery.reserveSoc).toBe(30)
-    expect(settings.history.retentionDays).toBe(7)
+    expect(settings.history.retentionDays).toBe(31)
     expect(backups()).toHaveLength(1)
     expect(existsSync(settingsPath)).toBe(true)
     updateSecurity({ passcode: null })
@@ -784,7 +788,7 @@ describe('settings file integrity', () => {
     try {
       const fresh = await import('../settings.js')
       const settings = fresh.loadSettings()
-      expect(settings.history.retentionDays).toBe(7)
+      expect(settings.history.retentionDays).toBe(31)
       expect(settings.sigen.port).toBe(502)
       expect(settings.sigen.host).toBe('10.1.2.3')
       expect(settings.poll.defaultIntervalMs).toBe(60000)
@@ -881,16 +885,16 @@ describe('settings salvage edge cases', () => {
 
 describe('settings reset and history', () => {
   it('keeps the history retention across a reset so no stored history is pruned', () => {
-    updateSettings({ setupComplete: true, history: { retentionDays: 30 } })
+    updateSettings({ setupComplete: true, history: { retentionDays: 45 } })
     const changes = []
     const stop = onSettingsChange((changed) => changes.push(...changed))
     const after = resetSettings()
     stop()
     expect(after.setupComplete).toBe(false)
-    expect(after.history.retentionDays).toBe(30)
+    expect(after.history.retentionDays).toBe(45)
     expect(changes).not.toContain('history')
     const reloaded = loadSettings()
-    expect(reloaded.history.retentionDays).toBe(30)
+    expect(reloaded.history.retentionDays).toBe(45)
     expect(reloaded.setupComplete).toBe(false)
     expect(reloaded.poll.defaultIntervalMs).toBe(60000)
   })

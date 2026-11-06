@@ -457,9 +457,9 @@ const validHistory = ({ retentionDays }) => ({ retentionDays: validRetentionDays
 
 const validRetentionDays = (value) => {
   if (!Number.isInteger(value) || value < 1 || value > MAX_RETENTION_DAYS) {
-    throw badRequest(`history retention must be an integer between 1 and ${MAX_RETENTION_DAYS} days`)
+    throw badRequest(`history retention must be an integer between ${MIN_RETENTION_DAYS} and ${MAX_RETENTION_DAYS} days`)
   }
-  return value
+  return Math.max(MIN_RETENTION_DAYS, value)
 }
 
 const validSmartLoads = ({ showOnDashboard, labels } = {}) => ({
@@ -925,6 +925,8 @@ const MIN_WEATHER_REFRESH_MS = 60000
 const MAX_BATTERY_CAPACITY_KWH = 200
 
 const MAX_RESERVE_SOC = 99
+
+const MIN_RETENTION_DAYS = 31
 
 const MAX_RETENTION_DAYS = 90
 

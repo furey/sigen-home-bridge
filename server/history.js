@@ -35,7 +35,7 @@ export const getRecentHistory = () => compactRecent()
 export const historyStats = () => {
   if (!db) return { count: 0, firstT: null, lastT: null }
   const from = retainedFloor()
-  return { count: retainedCount(from), firstT: firstTime({ ...FULL_RANGE, from }), lastT: lastTime(FULL_RANGE) }
+  return { count: storedRows, firstT: firstTime({ ...FULL_RANGE, from }), lastT: lastTime(FULL_RANGE) }
 }
 
 export const nearestSample = ({ before = null, after = null } = {}) => {
@@ -208,9 +208,6 @@ const retainedFloor = () => {
   return newest == null ? FULL_RANGE.from : newest - retentionMs()
 }
 
-const retainedCount = (from) =>
-  retentionMs() < RECENT_WINDOW_MS ? storedRows - statements.countBefore.get(from).count : storedRows
-
 const retainedOnly = (sample, floor) => (sample && sample.t >= floor ? sample : null)
 
 const timeRange = (since, until) => ({
@@ -302,7 +299,6 @@ const prepareStatements = () => ({
   pruneBefore: db.prepare('DELETE FROM samples WHERE t < ?'),
   dropOldest: db.prepare('DELETE FROM samples WHERE t < (SELECT t FROM samples ORDER BY t LIMIT 1 OFFSET ?)'),
   count: db.prepare('SELECT COUNT(*) AS count FROM samples'),
-  countBefore: db.prepare('SELECT COUNT(*) AS count FROM samples WHERE t < ?'),
   firstTime: db.prepare('SELECT MIN(t) AS t FROM samples WHERE t >= :from AND t < :before'),
   lastTime: db.prepare('SELECT MAX(t) AS t FROM samples WHERE t >= :from AND t < :before'),
   latest: db.prepare(`SELECT ${COLUMNS} FROM samples WHERE t >= :from AND t < :before ORDER BY t DESC LIMIT :limit`),
@@ -392,7 +388,7 @@ const pruneDatabase = () => {
 }
 
 const pruneFrom = (newestT, { force = false } = {}) => {
-  const cutoff = newestT - Math.max(retentionMs(), RECENT_WINDOW_MS)
+  const cutoff = newestT - retentionMs()
   if (!force && cutoff - lastPruneCutoff < PRUNE_STEP_MS) return
   const { changes } = statements.pruneBefore.run(cutoff)
   storedRows -= changes

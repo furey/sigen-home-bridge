@@ -10,15 +10,15 @@ import UnsavedDialog from './UnsavedDialog.vue'
 
 const { data, loadOnce } = useSettings()
 
-const form = reactive({ retentionDays: 7 })
+const form = reactive({ retentionDays: 31 })
 const resolution = ref('raw')
 const stats = ref(null)
 const exporting = ref(null)
 const exportError = ref('')
 
-const RETENTION_MIN = 1
+const RETENTION_MIN = 31
 const RETENTION_MAX = 90
-const RETENTION_DEFAULT = 7
+const RETENTION_DEFAULT = 31
 
 const RESOLUTIONS = [
   { value: 'raw', label: 'Every sample' },

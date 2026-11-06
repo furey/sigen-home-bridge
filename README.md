@@ -74,7 +74,7 @@
 
 - ❌ **A controller:** the bridge is read-only. It never writes to your Sigenergy system, so it can't change charge modes, schedules, or settings.
 - ❌ **A Home Assistant integration:** it's a standalone service. If you already run Home Assistant, you may prefer its Sigenergy Modbus integrations instead.
-- ❌ **A long-term energy historian:** the trends chart reaches back over your retention window (default 7 days, up to 90), not years. For long-term statistics and billing-grade data, pair it with something purpose-built.
+- ❌ **A long-term energy historian:** the trends chart reaches back over your retention window (31 to 90 days), not years. For long-term statistics and billing-grade data, pair it with something purpose-built.
 - ❌ **Authenticated on its own:** there's no built-in login, so on your LAN it's open by design. Reach it from outside by fronting the tunnel with Cloudflare Access rather than port-forwarding the raw app (see [Security](#security)).
 
 ## Features

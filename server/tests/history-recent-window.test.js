@@ -1,18 +1,14 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 const dataDir = mkdtempSync(join(tmpdir(), 'sigen-history-recent-'))
 
 process.env.DATA_DIR = dataDir
-process.env.HISTORY_RETENTION_DAYS = '1'
 
 const { loadSettings } = await import('../settings.js')
-const {
-  startHistory, recordSample, getRecentHistory, getHistory, historyStats, nearestSample, exportRows
-} = await import('../history.js')
+const { startHistory, recordSample, getRecentHistory } = await import('../history.js')
 
 beforeAll(() => {
   loadSettings()
@@ -22,13 +18,6 @@ beforeAll(() => {
 afterAll(() => rmSync(dataDir, { recursive: true, force: true }))
 
 const HOUR_MS = 3600000
-
-const storedLoads = () => {
-  const db = new DatabaseSync(join(dataDir, 'history.db'))
-  const rows = db.prepare('SELECT loadPower FROM samples ORDER BY t').all()
-  db.close()
-  return rows.map((row) => row.loadPower)
-}
 
 const reading = (t, loadPower) => ({
   lastUpdated: new Date(t).toISOString(),
@@ -41,29 +30,11 @@ const reading = (t, loadPower) => ({
   outdoorTemp: null
 })
 
-describe('recent history with one day of retention', () => {
+describe('recent history window', () => {
   it('holds a full 25-hour daylight saving day in memory', () => {
     const midnight = Date.parse('2034-04-01T13:00:00.000Z')
     recordSample(reading(midnight, 111))
     recordSample(reading(midnight + 25 * HOUR_MS, 222))
     expect(getRecentHistory().map((sample) => sample.loadPower)).toEqual([111, 222])
-  })
-
-  it('keeps 26 hours in the database so a restart restores the whole day', () => {
-    const midnight = Date.parse('2035-04-07T13:00:00.000Z')
-    recordSample(reading(midnight, 333))
-    recordSample(reading(midnight + 25 * HOUR_MS, 444))
-    expect(storedLoads()).toEqual([333, 444])
-  })
-
-  it('shows only the retained day through every history read', () => {
-    const newest = Date.parse('2035-04-07T13:00:00.000Z') + 25 * HOUR_MS
-    const loads = (rows) => rows.map((sample) => sample.loadPower)
-    expect(loads(getHistory({ since: 0 }))).toEqual([444])
-    expect(loads(getHistory({ since: 0, every: 60 }))).toEqual([444])
-    expect(historyStats()).toEqual({ count: 1, firstT: newest, lastT: newest })
-    expect(nearestSample({ before: newest })).toBeNull()
-    expect(nearestSample({ after: 0 }).loadPower).toBe(444)
-    expect(loads([...exportRows()])).toEqual([444])
   })
 })

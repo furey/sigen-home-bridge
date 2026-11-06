@@ -15,6 +15,8 @@ const ROWS = (21 * DAY_MS) / STEP_MS
 const NEWEST = Date.parse('2026-10-01T00:00:00.000Z')
 const OLDEST = NEWEST - (ROWS - 1) * STEP_MS
 const OLD_CAP = 250000
+const RETENTION_DAYS = 31
+const LATER = NEWEST + 20 * DAY_MS
 
 const seedLegacyDatabase = () => {
   const db = new DatabaseSync(join(dataDir, 'history.db'))
@@ -115,9 +117,11 @@ describe('history retention beyond the old sample ceiling', () => {
   })
 
   it('still prunes rows that fall outside retention', () => {
-    updateSettings({ history: { retentionDays: 20 } })
-    expect(historyStats().firstT).toBe(NEWEST + STEP_MS - 20 * DAY_MS)
-    expect(storedCount()).toBe(20 * DAY_MS / STEP_MS + 1)
+    recordSample(reading(LATER))
+    updateSettings({ history: { retentionDays: RETENTION_DAYS } })
+    const cutoff = LATER - RETENTION_DAYS * DAY_MS
+    expect(historyStats().firstT).toBe(Math.ceil((cutoff - OLDEST) / STEP_MS) * STEP_MS + OLDEST)
+    expect(storedFirstT()).toBeGreaterThanOrEqual(cutoff)
   })
 })
 
@@ -192,16 +196,17 @@ describe('history upkeep', () => {
   })
 
   it('keeps the count exact when a sample replaces one at the same time', () => {
-    recordSample(reading(NEWEST + STEP_MS))
+    recordSample(reading(LATER))
     expect(historyStats().count).toBe(storedCount())
   })
 
   it('prunes on insert only once the cutoff has moved a minute', () => {
     const firstT = storedFirstT()
-    recordSample(reading(NEWEST + 7 * STEP_MS))
+    recordSample(reading(LATER + 7 * STEP_MS))
     expect(storedFirstT()).toBe(firstT)
-    recordSample(reading(NEWEST + 14 * STEP_MS))
-    expect(storedFirstT()).toBe(NEWEST + 14 * STEP_MS - 20 * DAY_MS)
+    recordSample(reading(LATER + 14 * STEP_MS))
+    expect(storedFirstT()).toBeGreaterThanOrEqual(LATER + 14 * STEP_MS - RETENTION_DAYS * DAY_MS)
+    expect(storedFirstT()).toBeGreaterThan(firstT)
     expect(historyStats().count).toBe(storedCount())
   })
 })

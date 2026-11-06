@@ -77,7 +77,7 @@ describe('history retention', () => {
   it('drops samples older than the window, measured from the newest sample', () => {
     const base = Date.parse('2031-01-01T00:00:00.000Z')
     recordSample(reading({ lastUpdated: new Date(base).toISOString(), loadPower: 111 }))
-    recordSample(reading({ lastUpdated: new Date(base + 10 * DAY_MS).toISOString(), loadPower: 222 }))
+    recordSample(reading({ lastUpdated: new Date(base + 40 * DAY_MS).toISOString(), loadPower: 222 }))
     const all = getHistory({ since: base - DAY_MS })
     expect(all.some((sample) => sample.loadPower === 111)).toBe(false)
     expect(all.at(-1).loadPower).toBe(222)

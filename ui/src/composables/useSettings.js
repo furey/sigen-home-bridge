@@ -266,7 +266,7 @@ const data = reactive({
   poll: { defaultIntervalMs: 5000, reconnectDelayMs: 10000, schedule: [] },
   weather: { enabled: true, latitude: null, longitude: null, units: 'celsius', refreshMs: 600000 },
   battery: { capacityKwh: null, reserveSoc: 0, chargeUnit: 'percent' },
-  history: { retentionDays: 7 },
+  history: { retentionDays: 31 },
   smartLoads: { showOnDashboard: false, labels: {} },
   solar: { stringNames: {} },
   alerts: { items: [] },

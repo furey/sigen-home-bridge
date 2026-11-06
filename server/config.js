@@ -29,7 +29,7 @@ export const CONFIG_DEFAULTS = Object.freeze({
   },
   poll: { defaultIntervalMs: 5000, reconnectDelayMs: 10000, schedule: [] },
   weather: { enabled: true, latitude: null, longitude: null, units: 'celsius', refreshMs: 600000 },
-  history: { retentionDays: 7 }
+  history: { retentionDays: 31 }
 })
 
 const fallback = CONFIG_DEFAULTS

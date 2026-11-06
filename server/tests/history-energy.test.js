@@ -6,7 +6,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 const dataDir = mkdtempSync(join(tmpdir(), 'sigen-history-energy-'))
 
 process.env.DATA_DIR = dataDir
-process.env.HISTORY_RETENTION_DAYS = '7'
 
 const { loadSettings } = await import('../settings.js')
 const { startHistory, recordSample, energyByPeriods, parseEnergyBounds } = await import('../history.js')
@@ -88,7 +87,7 @@ describe('history energy by period', () => {
   })
 
   it('leaves out readings older than the retention window', () => {
-    recordSample(reading(DAY_ONE + 8 * DAY_MS + 12 * HOUR_MS, { loadPower: 1 }))
+    recordSample(reading(DAY_ONE + 32 * DAY_MS + 12 * HOUR_MS, { loadPower: 1 }))
     const [first, second] = energyByPeriods(days(2))
     expect(first.energy.pvPower.positive).toBe(0)
     expect(second.energy.loadPower.positive).toBeGreaterThan(0)
