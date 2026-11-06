@@ -96,7 +96,7 @@ const COLOR_COLUMNS = [
 </script>
 
 <template>
-  <section class="p-5 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800">
+  <section class="p-5 rounded-2xl phone-bleed bg-zinc-900 ring-1 ring-zinc-800">
     <div>
       <div class="flex items-center gap-2 mb-3 text-sm text-zinc-400">
         <Palette class="w-4 h-4" />Theme &amp; colours

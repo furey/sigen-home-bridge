@@ -767,7 +767,7 @@ watch([() => visible.value.length, windowReady, () => panEnd.value], () => {
 </script>
 
 <template>
-  <section class="flex flex-col gap-3 rounded-2xl bg-zinc-900 p-4 ring-1 ring-zinc-800 sm:p-5">
+  <section class="flex flex-col gap-3 rounded-2xl phone-bleed bg-zinc-900 p-4 ring-1 ring-zinc-800 sm:p-5">
     <div
       ref="header"
       class="flex flex-wrap items-center gap-x-4 gap-y-2"

@@ -28,6 +28,15 @@
   padding-top: max(var(--safe-floor-top), env(safe-area-inset-top));
 }
 
+@utility phone-bleed {
+  @media (max-width: 639px) {
+    margin-right: calc(-1 * max(var(--safe-floor-side), env(safe-area-inset-right)));
+    margin-left: calc(-1 * max(var(--safe-floor-side), env(safe-area-inset-left)));
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+}
+
 @utility min-h-app {
   min-height: var(--app-min-height);
 }

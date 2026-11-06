@@ -182,7 +182,7 @@ const lastUpdated = computed(() =>
       <template v-for="cell in quadrants" :key="cell.key">
         <div
           v-if="cell.key === 'battery'"
-          class="relative flex flex-col h-full p-4 transition dual-cell rounded-2xl bg-zinc-900 ring-1 ring-zinc-800 hover:ring-zinc-700 sm:p-5 @container"
+          class="relative flex flex-col h-full p-4 transition dual-cell rounded-2xl phone-bleed bg-zinc-900 ring-1 ring-zinc-800 hover:ring-zinc-700 sm:p-5 @container"
         >
           <button
             class="absolute inset-y-0 left-0 z-10 w-1/2 rounded-l-2xl"
@@ -267,7 +267,7 @@ const lastUpdated = computed(() =>
 
         <div
           v-else-if="cell.key === 'loadPower' && showCostTile"
-          class="relative flex flex-col h-full p-4 transition dual-cell rounded-2xl bg-zinc-900 ring-1 ring-zinc-800 hover:ring-zinc-700 sm:p-5"
+          class="relative flex flex-col h-full p-4 transition dual-cell rounded-2xl phone-bleed bg-zinc-900 ring-1 ring-zinc-800 hover:ring-zinc-700 sm:p-5"
         >
           <button
             class="absolute inset-y-0 left-0 z-10 w-1/2 rounded-l-2xl"
@@ -332,7 +332,7 @@ const lastUpdated = computed(() =>
 
         <button
           v-else
-          class="block h-full p-4 text-left transition rounded-2xl bg-zinc-900 ring-1 ring-zinc-800 hover:ring-zinc-700 sm:p-5"
+          class="block h-full p-4 text-left transition rounded-2xl phone-bleed bg-zinc-900 ring-1 ring-zinc-800 hover:ring-zinc-700 sm:p-5"
           @click="open(cell.metric)"
         >
           <span class="flex flex-col w-full h-full">

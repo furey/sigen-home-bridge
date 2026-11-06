@@ -73,7 +73,7 @@ function buildPatch() {
 </script>
 
 <template>
-  <section class="p-5 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800">
+  <section class="p-5 rounded-2xl phone-bleed bg-zinc-900 ring-1 ring-zinc-800">
     <div class="flex items-center gap-2 mb-3 text-sm text-zinc-400">
       <BatteryFull class="w-4 h-4" />Usable capacity
     </div>
@@ -99,7 +99,7 @@ function buildPatch() {
     </p>
   </section>
 
-  <section class="p-5 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800">
+  <section class="p-5 rounded-2xl phone-bleed bg-zinc-900 ring-1 ring-zinc-800">
     <div class="flex items-center gap-2 mb-3 text-sm text-zinc-400">
       <Percent class="w-4 h-4" />Charge readout
     </div>
@@ -113,7 +113,7 @@ function buildPatch() {
     </select>
   </section>
 
-  <section class="p-5 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800">
+  <section class="p-5 rounded-2xl phone-bleed bg-zinc-900 ring-1 ring-zinc-800">
     <div class="flex items-center justify-between mb-3">
       <div class="flex items-center gap-2 text-sm text-zinc-400">
         <BatteryLow class="w-4 h-4" />Reserve charge<InfoTip topic="reserveCharge" />
@@ -130,7 +130,7 @@ function buildPatch() {
 
   <section
     v-if="hasEnergyStats"
-    class="p-5 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800"
+    class="p-5 rounded-2xl phone-bleed bg-zinc-900 ring-1 ring-zinc-800"
   >
     <div class="flex items-center gap-2 mb-3 text-sm text-zinc-400">
       <Activity class="w-4 h-4" />Energy statistics<InfoTip topic="energyStats" />

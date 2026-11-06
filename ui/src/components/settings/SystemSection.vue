@@ -133,7 +133,7 @@ function buildPatch() {
 </script>
 
 <template>
-  <section class="flex items-center justify-between gap-4 p-5 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800">
+  <section class="flex items-center justify-between gap-4 p-5 rounded-2xl phone-bleed bg-zinc-900 ring-1 ring-zinc-800">
     <div>
       <p class="text-sm text-zinc-300">Setup wizard</p>
       <p class="text-xs text-zinc-500 !text-pretty">Re-walk the guided setup; saved values prefill.</p>
@@ -143,7 +143,7 @@ function buildPatch() {
     </button>
   </section>
 
-  <section class="p-5 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800">
+  <section class="p-5 rounded-2xl phone-bleed bg-zinc-900 ring-1 ring-zinc-800">
     <div class="flex items-center justify-between mb-3">
       <div class="flex items-center gap-2 text-sm text-zinc-400">
         <Server class="w-4 h-4" />Server
@@ -160,7 +160,7 @@ function buildPatch() {
     </label>
   </section>
 
-  <section class="p-5 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800">
+  <section class="p-5 rounded-2xl phone-bleed bg-zinc-900 ring-1 ring-zinc-800">
     <div class="flex items-center justify-between gap-4">
       <div>
         <p class="text-sm text-zinc-300">Device breakdown</p>
@@ -190,7 +190,7 @@ function buildPatch() {
     </div>
   </section>
 
-  <section class="p-5 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800">
+  <section class="p-5 rounded-2xl phone-bleed bg-zinc-900 ring-1 ring-zinc-800">
     <div class="flex items-center gap-2 mb-3 text-sm text-zinc-400">
       <Braces class="w-4 h-4" />JSON API
     </div>
@@ -220,7 +220,7 @@ function buildPatch() {
     </p>
   </section>
 
-  <section class="p-5 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800">
+  <section class="p-5 rounded-2xl phone-bleed bg-zinc-900 ring-1 ring-zinc-800">
     <div class="flex items-center gap-2 mb-3 text-sm text-zinc-400">
       <DatabaseBackup class="w-4 h-4" />Backup & restore
     </div>
@@ -251,7 +251,7 @@ function buildPatch() {
     </p>
   </section>
 
-  <section class="p-5 rounded-2xl bg-red-950/30 ring-1 ring-red-900/50">
+  <section class="p-5 rounded-2xl phone-bleed bg-red-950/30 ring-1 ring-red-900/50">
     <div class="flex items-center gap-2 mb-3 text-sm text-red-300">
       <Trash2 class="w-4 h-4" />Danger zone
     </div>

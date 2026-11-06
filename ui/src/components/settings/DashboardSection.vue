@@ -77,7 +77,7 @@ function buildPatch() {
 </script>
 
 <template>
-  <section class="p-5 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800">
+  <section class="p-5 rounded-2xl phone-bleed bg-zinc-900 ring-1 ring-zinc-800">
     <div class="flex items-center gap-2 mb-3 text-sm text-zinc-400">
       <Type class="w-4 h-4" />Dashboard title
     </div>
@@ -86,7 +86,7 @@ function buildPatch() {
     <p class="mt-2 text-xs text-zinc-500">Shown in the dashboard header and the browser tab.</p>
   </section>
 
-  <section class="p-5 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800">
+  <section class="p-5 rounded-2xl phone-bleed bg-zinc-900 ring-1 ring-zinc-800">
     <div class="flex items-center gap-2 mb-3 text-sm text-zinc-400">
       <Zap class="w-4 h-4" />Power readings
     </div>
@@ -114,7 +114,7 @@ function buildPatch() {
     </div>
   </section>
 
-  <section class="p-5 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800">
+  <section class="p-5 rounded-2xl phone-bleed bg-zinc-900 ring-1 ring-zinc-800">
     <div class="flex items-center justify-between mb-3">
       <div class="flex items-center gap-2 text-sm text-zinc-400">
         <Gauge class="w-4 h-4" />Reading size<InfoTip topic="metricScale" />

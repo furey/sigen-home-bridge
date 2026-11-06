@@ -123,7 +123,7 @@ function buildPatch() {
     </a>
   </HowTo>
 
-  <section class="p-5 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800">
+  <section class="p-5 rounded-2xl phone-bleed bg-zinc-900 ring-1 ring-zinc-800">
     <div class="flex items-center gap-2 mb-3 text-sm text-zinc-400">
       <CircleDollarSign class="w-4 h-4" />Tariff
     </div>
@@ -151,7 +151,7 @@ function buildPatch() {
     </div>
   </section>
 
-  <section class="p-5 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800">
+  <section class="p-5 rounded-2xl phone-bleed bg-zinc-900 ring-1 ring-zinc-800">
     <div class="flex items-center gap-2 mb-3 text-sm text-zinc-400">
       <Clock class="w-4 h-4" />Daily supply charge
     </div>
@@ -162,7 +162,7 @@ function buildPatch() {
     </label>
   </section>
 
-  <section class="p-5 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800">
+  <section class="p-5 rounded-2xl phone-bleed bg-zinc-900 ring-1 ring-zinc-800">
     <div class="flex items-center gap-2 mb-3 text-sm text-zinc-400">
       <ArrowDownToLine class="w-4 h-4" />Import
     </div>
@@ -199,7 +199,7 @@ function buildPatch() {
     </div>
   </section>
 
-  <section class="p-5 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800">
+  <section class="p-5 rounded-2xl phone-bleed bg-zinc-900 ring-1 ring-zinc-800">
     <div class="flex items-center gap-2 mb-3 text-sm text-zinc-400">
       <ArrowUpFromLine class="w-4 h-4" />Export (feed-in)
     </div>
@@ -236,7 +236,7 @@ function buildPatch() {
     </div>
   </section>
 
-  <section class="p-5 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800">
+  <section class="p-5 rounded-2xl phone-bleed bg-zinc-900 ring-1 ring-zinc-800">
     <div class="flex items-center justify-between mb-3">
       <span class="text-sm text-zinc-400">Super-export credit</span>
       <label class="flex items-center gap-2 text-sm text-zinc-300">
@@ -260,7 +260,7 @@ function buildPatch() {
     </div>
   </section>
 
-  <section class="p-5 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800">
+  <section class="p-5 rounded-2xl phone-bleed bg-zinc-900 ring-1 ring-zinc-800">
     <div class="flex items-center justify-between mb-3">
       <span class="flex items-center gap-1 text-sm text-zinc-400">
         Zero-draw credit

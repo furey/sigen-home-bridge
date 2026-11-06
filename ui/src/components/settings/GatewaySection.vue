@@ -68,7 +68,7 @@ const fromSeconds = (value) => Math.max(1, Math.floor(Number(value) || 1)) * 100
 </script>
 
 <template>
-  <section class="p-5 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800">
+  <section class="p-5 rounded-2xl phone-bleed bg-zinc-900 ring-1 ring-zinc-800">
     <div class="flex items-center gap-2 mb-3 text-sm text-zinc-400">
       <Cable class="w-4 h-4" />Gateway
     </div>
@@ -140,7 +140,7 @@ const fromSeconds = (value) => Math.max(1, Math.floor(Number(value) || 1)) * 100
     <p v-else-if="scanError" class="mt-3 text-sm text-red-400">{{ scanError }}</p>
   </section>
 
-  <section class="p-5 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800">
+  <section class="p-5 rounded-2xl phone-bleed bg-zinc-900 ring-1 ring-zinc-800">
     <div class="flex items-center gap-2 mb-3 text-sm text-zinc-400">
       <Clock class="w-4 h-4" />Polling
     </div>

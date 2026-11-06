@@ -91,7 +91,7 @@ const remove = async () => {
 </script>
 
 <template>
-  <section class="p-5 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800">
+  <section class="p-5 rounded-2xl phone-bleed bg-zinc-900 ring-1 ring-zinc-800">
     <div class="flex items-center justify-between mb-3">
       <div class="flex items-center gap-2 text-sm text-zinc-400">
         <Lock class="w-4 h-4" />Settings passcode<InfoTip topic="passcode" />

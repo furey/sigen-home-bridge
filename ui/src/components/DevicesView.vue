@@ -98,7 +98,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         <article
           v-for="device in inverters"
           :key="device.unitId"
-          class="p-4 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800 sm:p-5"
+          class="p-4 rounded-2xl phone-bleed bg-zinc-900 ring-1 ring-zinc-800 sm:p-5"
         >
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
@@ -194,7 +194,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         <article
           v-for="load in smartLoads"
           :key="`smartLoad-${load.index}`"
-          class="p-4 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800 sm:p-5"
+          class="p-4 rounded-2xl phone-bleed bg-zinc-900 ring-1 ring-zinc-800 sm:p-5"
         >
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">

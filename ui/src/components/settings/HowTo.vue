@@ -8,7 +8,7 @@ const open = ref(false)
 </script>
 
 <template>
-  <div class="rounded-xl bg-zinc-950/40 ring-1 ring-zinc-800">
+  <div class="rounded-xl phone-bleed bg-zinc-950/40 ring-1 ring-zinc-800">
     <button
       type="button"
       class="flex w-full items-center justify-between gap-2 px-4 py-3 text-sm font-medium text-zinc-300 hover:text-zinc-100"
