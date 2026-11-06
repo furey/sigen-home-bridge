@@ -6,13 +6,14 @@ export const TREND_RANGES = [
   { key: '5m', label: '5m', ms: 300000 },
   { key: '15m', label: '15m', ms: 900000 },
   { key: '1h', label: '1h', ms: 3600000 },
-  { key: '6h', label: '6h', ms: 21600000 },
-  { key: '24h', label: '24h', ms: 86400000 },
-  { key: '2d', label: '2d', ms: 172800000 },
-  { key: '7d', label: '7d', ms: 604800000 },
-  { key: '14d', label: '14d', ms: 1209600000 },
-  { key: '30d', label: '30d', ms: 2592000000 },
-  { key: '90d', label: '90d', ms: 7776000000 }
+  { key: '6h', label: '6h', ms: 21600000 }
+]
+
+export const TREND_MODES = [
+  { key: 'live', label: 'Now' },
+  { key: 'day', label: 'Day' },
+  { key: 'week', label: 'Week' },
+  { key: 'month', label: 'Month' }
 ]
 
 export const useDashboardView = () => {
@@ -26,6 +27,7 @@ const createStore = () => {
   watch(view, persist)
 
   const setRange = (key) => { view.range = key }
+  const setMode = (key) => { view.mode = key }
   const toggleMetric = (key) => {
     if (view.hidden.length === 0) {
       view.hidden = METRIC_KEYS.filter((entry) => entry !== key)
@@ -41,7 +43,7 @@ const createStore = () => {
       ? view.hidden.filter((entry) => entry !== key)
       : [...view.hidden, key]
   }
-  return { view, setRange, toggleMetric }
+  return { view, setRange, setMode, toggleMetric }
 }
 
 export const rangeFor = (key) => TREND_RANGES[Math.max(0, rangeIndex(key))]
@@ -52,15 +54,25 @@ const METRIC_KEYS = METRICS.map((metric) => metric.key)
 
 const STORAGE_KEY = 'sigenDashboardView'
 
-const DEFAULTS = { trends: false, range: '1h', hidden: [] }
+const DEFAULTS = { trends: false, mode: 'live', range: '1h', hidden: [] }
+
+const LEGACY_RANGE_MODES = { '24h': 'day', '2d': 'week', '7d': 'week', '14d': 'week', '30d': 'month', '90d': 'month' }
 
 const rangeIndex = (key) => TREND_RANGES.findIndex((range) => range.key === key)
+
+const isMode = (key) => TREND_MODES.some((mode) => mode.key === key)
+
+const restoredMode = (saved) => {
+  if (isMode(saved.mode)) return saved.mode
+  return LEGACY_RANGE_MODES[saved.range] ?? DEFAULTS.mode
+}
 
 const restore = () => {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)) ?? {}
     return {
       trends: Boolean(saved.trends),
+      mode: restoredMode(saved),
       range: rangeIndex(saved.range) >= 0 ? saved.range : DEFAULTS.range,
       hidden: Array.isArray(saved.hidden)
         ? saved.hidden.filter((key) => typeof key === 'string')

@@ -2,7 +2,8 @@
 import { computed, onMounted, onUnmounted, ref, watch, watchEffect } from 'vue'
 import { useStateStream } from '../composables/useStateStream.js'
 import { useHistory } from '../composables/useHistory.js'
-import { TREND_RANGES, rangeFor, useDashboardView } from '../composables/useDashboardView.js'
+import { TREND_MODES, TREND_RANGES, rangeFor, useDashboardView } from '../composables/useDashboardView.js'
+import { calendarLabel, calendarTicks, calendarWindow } from '../lib/trendWindow.js'
 import { ChevronLast, ChevronLeft, ChevronRight, Clock, History } from '@lucide/vue'
 import { useHoverCapable } from '../composables/useHoverCapable.js'
 import { useScrub } from '../composables/useScrub.js'
@@ -16,7 +17,7 @@ import { skyGradientStops, sunCrossings } from '../lib/sun.js'
 
 const { state } = useStateStream()
 const { samples } = useHistory()
-const { view, setRange, toggleMetric } = useDashboardView()
+const { view, setRange, setMode, toggleMetric } = useDashboardView()
 const { data: settings } = useSettings()
 const hoverCapable = useHoverCapable()
 
@@ -27,21 +28,18 @@ const powerKeys = computed(() => (smartPortActive.value ? withSmartPort(POWER_KE
 const legendKeys = computed(() => (smartPortActive.value ? withSmartPort(LEGEND_KEYS) : LEGEND_KEYS))
 
 const stage = ref(null)
-const header = ref(null)
-const legendGroup = ref(null)
-const pillsGroup = ref(null)
-const headerWrapped = ref(false)
 const size = ref({ width: 0, height: 0 })
 const now = ref(Date.now())
 const scrubT = ref(null)
 const panEnd = ref(null)
+const offset = ref(0)
+const anchor = ref(null)
 const historyStats = ref(null)
 const windowSamples = ref([])
 const windowSamplesKey = ref('')
 const snapping = ref(false)
 
 let resizeObserver = null
-let headerObserver = null
 let ticker = null
 let statsTicker = null
 let windowToken = 0
@@ -53,13 +51,6 @@ onMounted(() => {
     size.value = { width: entry.contentRect.width, height: entry.contentRect.height }
   })
   resizeObserver.observe(stage.value)
-  headerObserver = new ResizeObserver(() => {
-    const legend = legendGroup.value
-    const pillsEl = pillsGroup.value
-    if (!legend || !pillsEl) return
-    headerWrapped.value = pillsEl.getBoundingClientRect().top >= legend.getBoundingClientRect().bottom
-  })
-  headerObserver.observe(header.value)
   ticker = setInterval(() => { now.value = Date.now() }, TICK_MS)
   statsTicker = setInterval(loadStats, STATS_INTERVAL_MS)
   loadStats()
@@ -69,7 +60,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   resizeObserver?.disconnect()
-  headerObserver?.disconnect()
   clearInterval(ticker)
   clearInterval(statsTicker)
   document.removeEventListener('visibilitychange', onVisibility)
@@ -93,33 +83,37 @@ const onVisibility = () => {
 
 const pollMs = computed(() => state.pollIntervalMs ?? POLL_FALLBACK_MS)
 const firstT = computed(() => historyStats.value?.firstT ?? null)
-const retainedSpanMs = computed(() => {
-  const stats = historyStats.value
-  return stats && Number.isFinite(stats.firstT) ? stats.lastT - stats.firstT : 0
-})
-const pills = computed(() => TREND_RANGES.filter((option, index) =>
-  option.ms <= DAY_MS || retainedSpanMs.value > TREND_RANGES[index - 1].ms))
+const isLive = computed(() => view.mode === 'live')
 const rangeDisabled = (option) => option.ms < pollMs.value * MIN_RANGE_POINTS
-const enabledRanges = computed(() => pills.value.filter((option) => !rangeDisabled(option)))
+const enabledRanges = computed(() => TREND_RANGES.filter((option) => !rangeDisabled(option)))
+
+const zoomSteps = computed(() => [
+  ...enabledRanges.value.map((option) => ({ mode: 'live', range: option.key })),
+  ...CALENDAR_MODES.map((mode) => ({ mode }))
+])
 
 const stepZoom = (delta) => {
-  const options = enabledRanges.value
-  const index = options.findIndex((option) => option.key === view.range) + delta
-  if (index < 0 || index >= options.length) return
-  setRange(options[index].key)
+  const steps = zoomSteps.value
+  const index = steps.findIndex((step) =>
+    step.mode === view.mode && (!isLive.value || step.range === view.range)) + delta
+  if (index < 0 || index >= steps.length) return
+  pickMode(steps[index].mode)
+  if (steps[index].range) setRange(steps[index].range)
+}
+
+const pickMode = (key) => {
+  if (key === view.mode) return
+  offset.value = 0
+  goLive()
+  setMode(key)
 }
 
 watchEffect(() => {
-  const options = enabledRanges.value
-  if (!options.length) return
+  if (!isLive.value || !rangeDisabled(rangeFor(view.range))) return
   const current = rangeFor(view.range)
-  const pollBlocked = rangeDisabled(current)
-  const retentionBlocked = historyStats.value != null
-    && current.ms > DAY_MS
-    && !pills.value.some((option) => option.key === current.key)
-  if (!pollBlocked && !retentionBlocked) return
-  const replacement = options.find((option) => option.ms > current.ms) ?? options.at(-1)
-  setRange(replacement.key)
+  const replacement = enabledRanges.value.find((option) => option.ms > current.ms)
+  if (replacement) return setRange(replacement.key)
+  pickMode('day')
 })
 
 const rangeNotice = ref(null)
@@ -223,17 +217,30 @@ const showing = (key) => !view.hidden.includes(key)
 const activePowerKeys = computed(() => powerKeys.value.filter(showing))
 
 const range = computed(() => rangeFor(view.range))
-const windowEnd = computed(() => panEnd.value == null ? now.value : panEnd.value)
-const windowStart = computed(() => windowEnd.value - range.value.ms)
+const today = computed(() => calendarWindow({ mode: 'day', now: now.value }).start)
+const periodNow = computed(() => (offset.value === 0 ? today.value : anchor.value ?? today.value))
+const calendar = computed(() =>
+  isLive.value ? null : calendarWindow({ mode: view.mode, offset: offset.value, now: periodNow.value }))
+const windowEnd = computed(() => {
+  if (calendar.value) return calendar.value.end
+  return panEnd.value == null ? now.value : panEnd.value
+})
+const windowStart = computed(() => calendar.value?.start ?? windowEnd.value - range.value.ms)
+const spanMs = computed(() => windowEnd.value - windowStart.value)
 
-const atLive = computed(() => panEnd.value == null)
+const atLive = computed(() => (isLive.value ? panEnd.value == null : offset.value === 0))
 const canStepEarlier = computed(() =>
-  firstT.value != null && windowEnd.value - range.value.ms > firstT.value)
+  firstT.value != null && windowStart.value > firstT.value)
 const atEarliest = computed(() => !canStepEarlier.value)
-const showPan = computed(() => !atLive.value || canStepEarlier.value)
+const showPan = computed(() => isLive.value && (!atLive.value || canStepEarlier.value))
 
 const stepEarlier = () => {
   if (!canStepEarlier.value) return
+  if (!isLive.value) {
+    if (offset.value === 0) anchor.value = today.value
+    offset.value += 1
+    return
+  }
   panDir = -1
   snappedOnce = false
   const target = windowEnd.value - range.value.ms
@@ -241,6 +248,7 @@ const stepEarlier = () => {
 }
 const stepLater = () => {
   if (atLive.value) return
+  if (!isLive.value) { offset.value -= 1; return }
   const target = panEnd.value + range.value.ms
   const reachesLiveWindow = target > now.value - range.value.ms
   if (reachesLiveWindow) return goLive()
@@ -248,7 +256,7 @@ const stepLater = () => {
   snappedOnce = false
   panEnd.value = target
 }
-const goLive = () => { panEnd.value = null; panDir = 0 }
+const goLive = () => { panEnd.value = null; panDir = 0; offset.value = 0 }
 
 watchEffect(() => {
   if (panEnd.value == null) return
@@ -258,12 +266,13 @@ watchEffect(() => {
   if (panEnd.value >= now.value) panEnd.value = null
 })
 
-const everyMs = computed(() => Math.max(pollMs.value, Math.round(range.value.ms / POINT_BUDGET)))
+const everyMs = computed(() => Math.max(pollMs.value, Math.round(spanMs.value / POINT_BUDGET)))
 const liveOldestT = computed(() => samples.value.length ? samples.value[0].t : null)
 const useWindowFetch = computed(() =>
   liveOldestT.value != null && windowStart.value < liveOldestT.value)
 const fetchSince = computed(() => Math.floor(windowStart.value / everyMs.value) * everyMs.value)
-const fetchUntil = computed(() => Math.ceil(windowEnd.value / everyMs.value) * everyMs.value)
+const fetchUntil = computed(() =>
+  Math.ceil(Math.min(windowEnd.value, now.value) / everyMs.value) * everyMs.value)
 const fetchKey = computed(() =>
   useWindowFetch.value ? `${fetchSince.value}|${fetchUntil.value}|${everyMs.value}` : '')
 
@@ -273,11 +282,14 @@ const windowReady = computed(() =>
 const visible = computed(() => sliceWindow(chartSource.value))
 const ready = computed(() =>
   size.value.width > 0 && size.value.height > 0 && visible.value.length > 1)
-const windowLabel = computed(() => formatSpan(windowStart.value, windowEnd.value))
+const windowLabel = computed(() => (calendar.value
+  ? calendarLabel({ mode: view.mode, offset: offset.value, ...calendar.value })
+  : formatSpan(windowStart.value, windowEnd.value)))
+const totalsLabel = computed(() => (isLive.value ? `${range.value.label} totals` : TOTALS_LABELS[view.mode]))
 const emptyMessage = computed(() => {
   if (snapping.value) return 'No readings in this window, jumping to the nearest…'
   if (!windowReady.value) return 'Loading…'
-  if (panEnd.value != null) return 'No readings in this window'
+  if (!atLive.value) return 'No readings in this window'
   return 'Collecting history…'
 })
 
@@ -359,7 +371,7 @@ const domain = computed(() => {
   return { min: min < 0 ? min - pad : 0, max: max + pad }
 })
 
-const x = (t) => PAD.left + ((t - windowStart.value) / range.value.ms) * inner.value.width
+const x = (t) => PAD.left + ((t - windowStart.value) / spanMs.value) * inner.value.width
 const yPower = (watts) => {
   const { min, max } = domain.value
   return PAD.top + (1 - (watts - min) / (max - min)) * inner.value.height
@@ -370,14 +382,14 @@ const zeroY = computed(() => yPower(0))
 const baselineY = computed(() => PAD.top + inner.value.height)
 const rightEdge = computed(() => PAD.left + inner.value.width)
 
-const strokeWidth = computed(() => (range.value.ms >= THIN_LINE_RANGE_MS ? 1 : 1.75))
+const strokeWidth = computed(() => (spanMs.value >= THIN_LINE_RANGE_MS ? 1 : 1.75))
 
 let touchScrubbing = false
 
 const scrubTo = (clientX) => {
   const rect = stage.value.getBoundingClientRect()
   const fraction = (clientX - rect.left - PAD.left) / (inner.value.width || 1)
-  scrubT.value = windowStart.value + Math.min(1, Math.max(0, fraction)) * range.value.ms
+  scrubT.value = windowStart.value + Math.min(1, Math.max(0, fraction)) * spanMs.value
 }
 
 const clearScrub = () => { scrubT.value = null }
@@ -432,8 +444,11 @@ const scrub = computed(() => {
   return { x: cx, dots }
 })
 
-const clockLabel = computed(() =>
-  tickLabel(scrubSample.value?.t ?? now.value, range.value.ms))
+const clockLabel = computed(() => {
+  const t = scrubSample.value?.t ?? now.value
+  if (view.mode === 'month') return new Date(t).toLocaleString([], MONTH_SCRUB_FORMAT)
+  return tickLabel(t, spanMs.value)
+})
 
 const segmentsFor = (key) => {
   const points = visible.value
@@ -467,11 +482,11 @@ const socSeries = computed(() => {
   }
 })
 
-const showSunLabels = computed(() => range.value.ms <= SUN_LABEL_MAX_MS)
+const showSunLabels = computed(() => spanMs.value <= SUN_LABEL_MAX_MS)
 const skyDetail = computed(() =>
-  Math.min(SKY_MAX_STOPS, Math.max(64, Math.round(range.value.ms / HOUR_MS))))
+  Math.min(SKY_MAX_STOPS, Math.max(64, Math.round(spanMs.value / HOUR_MS))))
 const sunDetail = computed(() =>
-  Math.min(SUN_MAX_STEPS, Math.max(96, Math.round(range.value.ms / HALF_HOUR_MS))))
+  Math.min(SUN_MAX_STEPS, Math.max(96, Math.round(spanMs.value / HALF_HOUR_MS))))
 
 const skyStops = computed(() => {
   const { outdoorLatitude: latitude, outdoorLongitude: longitude } = state
@@ -515,13 +530,21 @@ const flowGradients = computed(() => {
   return Object.entries(FLOW_SHADES).map(([key, shades]) => ({ key, fraction, ...shades }))
 })
 
-const xTicks = computed(() => TICK_FRACTIONS.map((fraction) => {
-  const t = windowStart.value + fraction * range.value.ms
+const tickPoints = computed(() => {
+  if (calendar.value) return calendarTicks({ mode: view.mode, ...calendar.value })
+  return TICK_FRACTIONS.map((fraction) => {
+    const t = windowStart.value + fraction * spanMs.value
+    return { t, label: tickLabel(t, spanMs.value) }
+  })
+})
+
+const xTicks = computed(() => tickPoints.value.map(({ t, label }) => {
+  const fraction = (t - windowStart.value) / spanMs.value
   return {
-    fraction,
+    t,
     x: x(t),
-    label: tickLabel(t, range.value.ms),
-    anchor: fraction === 0 ? 'start' : fraction === 1 ? 'end' : 'middle'
+    label,
+    anchor: fraction <= EDGE_FRACTION ? 'start' : fraction >= 1 - EDGE_FRACTION ? 'end' : 'middle'
   }
 }).filter((tick) => !collidesWithSunLabel(tick)))
 
@@ -537,10 +560,10 @@ const approxTextWidth = (text, fontSize) => text.length * fontSize * 0.68
 const yTicks = computed(() => {
   const { min, max } = domain.value
   const ticks = [
-    { y: yPower(max), label: kw(max) },
-    { y: zeroY.value, label: '0' }
+    { y: yPower(max) + Y_LABEL_BELOW, label: kw(max) },
+    { y: zeroY.value - Y_LABEL_ABOVE, label: '0' }
   ]
-  if (min < 0) ticks.push({ y: yPower(min), label: kw(min) })
+  if (min < 0) ticks.push({ y: yPower(min) - Y_LABEL_ABOVE, label: kw(min) })
   return ticks
 })
 
@@ -654,8 +677,8 @@ const areaPath = (segments, toX, toY, base) => segments
 const tickLabel = (t, rangeMs) => {
   const at = new Date(t)
   if (rangeMs <= FIVE_MIN_MS) return at.toLocaleTimeString([], { minute: '2-digit', second: '2-digit' })
-  if (rangeMs <= DAY_MS) return at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-  if (rangeMs <= WEEK_MS) return at.toLocaleString([], { weekday: 'short', hour: 'numeric' })
+  if (rangeMs <= DAY_MS + HOUR_MS) return at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  if (rangeMs <= WEEK_MS + HOUR_MS) return at.toLocaleString([], { weekday: 'short', hour: 'numeric' })
   return at.toLocaleDateString([], { day: 'numeric', month: 'short' })
 }
 
@@ -716,9 +739,21 @@ const TICK_FONT = 10
 
 const LABEL_GAP = 8
 
-const PAD = { top: 10, right: 16, bottom: 24, left: 36 }
+const PAD = { top: 10, right: 10, bottom: 24, left: 8 }
+
+const Y_LABEL_BELOW = 13
+
+const Y_LABEL_ABOVE = 4
+
+const CALENDAR_MODES = TREND_MODES.filter((mode) => mode.key !== 'live').map((mode) => mode.key)
+
+const TOTALS_LABELS = { day: 'Day totals', week: 'Week totals', month: 'Month totals' }
+
+const MONTH_SCRUB_FORMAT = { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }
 
 const TICK_FRACTIONS = [0, 1 / 3, 2 / 3, 1]
+
+const EDGE_FRACTION = 0.02
 
 const MAX_POINTS = 600
 
@@ -750,7 +785,7 @@ const DAY_MS = 86400000
 
 const WEEK_MS = 604800000
 
-const SUN_LABEL_MAX_MS = 86400000
+const SUN_LABEL_MAX_MS = 90000000
 
 const SKY_MAX_STOPS = 384
 
@@ -768,59 +803,34 @@ watch([() => visible.value.length, windowReady, () => panEnd.value], () => {
 
 <template>
   <section class="flex flex-col gap-3 rounded-2xl phone-bleed bg-zinc-900 p-4 ring-1 ring-zinc-800 sm:p-5">
-    <div
-      ref="header"
-      class="flex flex-wrap items-center gap-x-4 gap-y-2"
-      :class="headerWrapped ? 'justify-center' : 'justify-between'"
-    >
+    <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
       <div
-        ref="legendGroup"
-        class="flex flex-wrap items-center gap-x-4 gap-y-1"
-        :class="{ 'justify-center': headerWrapped }"
+        class="flex w-full gap-0.5 rounded-xl bg-zinc-950/60 p-1 ring-1 ring-zinc-800 sm:w-auto"
+        role="group"
+        aria-label="Trends period"
       >
-        <span
-          class="flex items-center gap-1.5 tabular-nums transition-colors"
-          :class="scrubSample ? 'text-zinc-100' : 'text-zinc-500'"
-          :title="scrubSample
-            ? 'Values at this point in time'
-            : `Totals across the last ${range.label}; hover or drag the chart to read a point`"
-        >
-          <Clock v-if="scrubSample" class="h-4 w-4" />
-          <span class="text-sm font-semibold leading-none">
-            {{ scrubSample ? clockLabel : `${range.label} totals` }}
-          </span>
-        </span>
         <button
-          v-for="item in legend"
-          :key="item.key"
-          class="flex items-center gap-1.5 tabular-nums transition-opacity"
-          :class="{ 'opacity-30': item.hidden }"
-          :title="`${item.title}, ${item.toggle}`"
-          :aria-pressed="!item.hidden"
-          @click="toggleMetric(item.key)"
+          v-for="mode in TREND_MODES"
+          :key="mode.key"
+          class="h-9 flex-1 rounded-lg px-4 text-sm font-medium transition sm:flex-none"
+          :class="mode.key === view.mode ? 'bg-zinc-700 text-zinc-50' : 'text-zinc-400 hover:text-zinc-200'"
+          :aria-pressed="mode.key === view.mode"
+          @click="pickMode(mode.key)"
         >
-          <component
-            :is="item.icon"
-            class="h-4 w-4"
-            :stroke-width="item.isArrow ? 2.5 : 2"
-            :style="{ color: item.iconColor }"
-          />
-          <span class="text-sm font-semibold leading-none" :style="{ color: item.color }">{{ item.value }}</span>
-          <span class="text-xs leading-none text-zinc-500">{{ item.unit }}</span>
+          {{ mode.label }}
         </button>
       </div>
-      <div ref="pillsGroup" class="flex items-center gap-1" role="radiogroup" aria-label="Trends range">
+      <div v-if="isLive" class="flex items-center gap-1 max-sm:w-full max-sm:justify-center" role="group" aria-label="Range">
         <button
-          v-for="option in pills"
+          v-for="option in TREND_RANGES"
           :key="option.key"
-          class="rounded-full px-2.5 py-1 text-xs tabular-nums transition"
+          class="h-8 rounded-full px-3 text-xs tabular-nums transition"
           :class="option.key === view.range
-            ? 'bg-zinc-800 text-zinc-100 ring-1 ring-zinc-600'
+            ? 'bg-zinc-100 text-zinc-900'
             : rangeDisabled(option)
               ? 'cursor-not-allowed text-zinc-700'
-              : 'text-zinc-500 hover:text-zinc-300'"
-          role="radio"
-          :aria-checked="option.key === view.range"
+              : 'text-zinc-400 ring-1 ring-zinc-800 hover:text-zinc-200'"
+          :aria-pressed="option.key === view.range"
           :aria-disabled="rangeDisabled(option)"
           :title="rangeDisabled(option)
             ? `Unavailable at the current polling rate; tap for details`
@@ -830,11 +840,78 @@ watch([() => visible.value.length, windowReady, () => panEnd.value], () => {
           {{ option.label }}
         </button>
       </div>
+      <div v-else class="grid grid-cols-[1fr_auto_1fr] items-center max-sm:w-full sm:w-96">
+        <div class="col-start-2 flex items-center gap-1">
+          <button
+            class="grid h-10 w-10 place-items-center rounded-full transition"
+            :class="atEarliest ? 'cursor-not-allowed text-zinc-700' : 'text-zinc-300 hover:text-zinc-100'"
+            :disabled="atEarliest"
+            aria-label="Earlier"
+            title="Earlier"
+            @click="stepEarlier"
+          >
+            <ChevronLeft class="h-5 w-5" />
+          </button>
+          <span class="w-36 truncate text-center text-sm font-semibold tabular-nums">{{ windowLabel }}</span>
+          <button
+            class="grid h-10 w-10 place-items-center rounded-full transition"
+            :class="atLive ? 'cursor-not-allowed text-zinc-700' : 'text-zinc-300 hover:text-zinc-100'"
+            :disabled="atLive"
+            aria-label="Later"
+            title="Later"
+            @click="stepLater"
+          >
+            <ChevronRight class="h-5 w-5" />
+          </button>
+        </div>
+        <button
+          v-if="!atLive"
+          class="col-start-3 justify-self-end rounded-full px-3 py-1.5 text-xs font-medium text-zinc-100 ring-1 ring-zinc-700 transition hover:bg-zinc-800"
+          @click="goLive"
+        >
+          Now
+        </button>
+      </div>
+    </div>
+
+    <div class="flex flex-col gap-2">
+      <span
+        class="flex items-center gap-1.5 tabular-nums transition-colors"
+        :class="scrubSample ? 'text-zinc-100' : 'text-zinc-500'"
+        :title="scrubSample
+          ? 'Values at this point in time'
+          : 'Totals across this window; hover or drag the chart to read a point'"
+      >
+        <Clock v-if="scrubSample" class="h-4 w-4" />
+        <span class="text-xs font-semibold uppercase tracking-wide leading-none">
+          {{ scrubSample ? clockLabel : totalsLabel }}
+        </span>
+      </span>
+      <div class="grid grid-cols-3 gap-x-3 gap-y-2.5 sm:flex sm:flex-wrap sm:gap-x-5">
+        <button
+          v-for="item in legend"
+          :key="item.key"
+          class="flex min-w-0 items-center gap-1.5 tabular-nums transition-opacity"
+          :class="{ 'opacity-30': item.hidden }"
+          :title="`${item.title}, ${item.toggle}`"
+          :aria-pressed="!item.hidden"
+          @click="toggleMetric(item.key)"
+        >
+          <component
+            :is="item.icon"
+            class="h-4 w-4 shrink-0"
+            :stroke-width="item.isArrow ? 2.5 : 2"
+            :style="{ color: item.iconColor }"
+          />
+          <span class="text-base font-semibold leading-none" :style="{ color: item.color }">{{ item.value }}</span>
+          <span class="text-xs leading-none text-zinc-500">{{ item.unit }}</span>
+        </button>
+      </div>
     </div>
 
     <div
       ref="stage"
-      class="relative min-h-0 flex-1 touch-none select-none"
+      class="relative min-h-0 flex-1 touch-none select-none max-sm:-mx-4 max-sm:max-h-[100vw] max-sm:min-h-[72vw]"
       @pointerdown="onPointerDown"
       @pointermove="onPointerMove"
       @pointerup="onPointerEnd"
@@ -937,14 +1014,14 @@ watch([() => visible.value.length, windowReady, () => panEnd.value], () => {
         <text
           v-for="tick in yTicks"
           :key="`y-${tick.label}`"
-          :x="PAD.left - 8" :y="tick.y + 3"
-          text-anchor="end" class="fill-zinc-600 text-[10px] tabular-nums"
+          :x="PAD.left + 2" :y="tick.y"
+          text-anchor="start" class="fill-zinc-500 text-[10px] tabular-nums"
         >
           {{ tick.label }}
         </text>
         <text
           v-for="tick in xTicks"
-          :key="`x-${tick.fraction}`"
+          :key="`x-${tick.t}`"
           :x="tick.x" :y="baselineY + 16"
           :text-anchor="tick.anchor" class="fill-zinc-600 text-[10px] tabular-nums"
         >
@@ -1002,11 +1079,11 @@ watch([() => visible.value.length, windowReady, () => panEnd.value], () => {
       <button
         v-if="!atLive"
         class="col-start-3 flex items-center gap-1 justify-self-end rounded-full px-1.5 py-0.5 font-medium text-green-500 transition duration-200 hover:text-green-300"
-        title="Back to live"
+        title="Back to now"
         @click="goLive"
       >
         <ChevronLast class="h-4 w-4" />
-        Live
+        Now
       </button>
     </div>
 
