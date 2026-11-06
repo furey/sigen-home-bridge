@@ -1,6 +1,6 @@
 import { state } from './state.js'
 import { getSettings } from './settings.js'
-import { getHistoryAll, historyStats } from './history.js'
+import { getRecentHistory, historyStats } from './history.js'
 import { batteryEstimate, dailyCost, netPerHour, tariffConfigured } from './derive.js'
 
 export const buildSnapshot = () => {
@@ -52,7 +52,7 @@ const battery = ({ capacityKwh, reserveSoc }) => ({
   reserveSoc,
   energyRemainingKwh: capacityKwh == null ? null : round((capacityKwh * state.batterySoc) / 100),
   direction: flowDirection(state.batteryPower, 'charge', 'discharge'),
-  estimate: batteryEstimate(getHistoryAll(), { capacityKwh, reserveSoc })
+  estimate: batteryEstimate(getRecentHistory(), { capacityKwh, reserveSoc })
 })
 
 const energy = () => ({
@@ -86,7 +86,7 @@ const tariffSection = ({ tariff, now }) =>
         tariff: {
           currency: tariff.currency,
           netPerHour: round(netPerHour({ tariff, gridWatts: state.gridPower ?? 0, now })),
-          today: roundValues(dailyCost({ samples: getHistoryAll(), tariff, now }))
+          today: roundValues(dailyCost({ samples: getRecentHistory(), tariff, now }))
         }
       }
     : {}

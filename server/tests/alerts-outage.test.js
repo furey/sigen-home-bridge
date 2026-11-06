@@ -77,7 +77,7 @@ describe('webhook retry', () => {
     process.env.DATA_DIR = mkdtempSync(join(tmpdir(), 'sigen-alerts-outage-'))
     vi.resetModules()
     vi.doMock('../settings.js', () => ({ getSettings: () => SETTINGS }))
-    vi.doMock('../history.js', () => ({ getHistoryAll: () => [] }))
+    vi.doMock('../history.js', () => ({ getRecentHistory: () => [] }))
     vi.useFakeTimers()
     vi.spyOn(console, 'log').mockImplementation(() => {})
     vi.stubGlobal('fetch', fetchMock)

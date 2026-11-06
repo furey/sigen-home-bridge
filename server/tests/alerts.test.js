@@ -160,7 +160,7 @@ describe('startAlerts', () => {
       })
     }))
     vi.doMock('../history.js', () => ({
-      getHistoryAll: () => {
+      getRecentHistory: () => {
         throw new Error('history unavailable')
       }
     }))

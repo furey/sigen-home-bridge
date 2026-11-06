@@ -159,7 +159,7 @@ describe('disabling or deleting an active alert', () => {
 const boot = async ({ soc, connected = true }) => {
   vi.resetModules()
   vi.doMock('../settings.js', () => ({ getSettings: () => settings }))
-  vi.doMock('../history.js', () => ({ getHistoryAll: () => [] }))
+  vi.doMock('../history.js', () => ({ getRecentHistory: () => [] }))
   const { state } = await import('../state.js')
   state.connected = connected
   state.batterySoc = soc

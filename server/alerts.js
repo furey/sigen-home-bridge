@@ -5,7 +5,7 @@ import { resolve } from 'node:path'
 import { config } from './config.js'
 import { getSettings } from './settings.js'
 import { state, publish } from './state.js'
-import { getHistoryAll } from './history.js'
+import { getRecentHistory } from './history.js'
 import { batteryEstimate, netPerHour, socPercent, tariffConfigured } from './derive.js'
 import { getTrigger } from './triggers.js'
 
@@ -115,7 +115,7 @@ const buildContext = (settings, now) => {
         tariff: settings.tariff, gridWatts: state.gridPower ?? 0, now: new Date(now)
       })
       : null,
-    estimate: batteryEstimate(getHistoryAll(), {
+    estimate: batteryEstimate(getRecentHistory(), {
       capacityKwh, reserveSoc: settings.battery.reserveSoc
     })
   }

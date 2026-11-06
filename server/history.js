@@ -30,7 +30,7 @@ export const getHistory = ({ limit = LIVE_LIMIT, order = 'asc', since = null, un
   return order === 'desc' ? rows.reverse() : rows
 }
 
-export const getHistoryAll = () => compactRecent()
+export const getRecentHistory = () => compactRecent()
 
 export const historyStats = () => {
   if (!db) return { count: 0, firstT: null, lastT: null }

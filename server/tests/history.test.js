@@ -9,7 +9,7 @@ process.env.DATA_DIR = dataDir
 process.env.HISTORY_RETENTION_DAYS = '7'
 
 const {
-  startHistory, getHistory, getHistoryAll, recordSample, downsampleHistory, historyToCsv, historyStats,
+  startHistory, getHistory, getRecentHistory, recordSample, downsampleHistory, historyToCsv, historyStats,
   historyExportChunks, exportRows, nearestSample, legacyImportRows, LIVE_LIMIT
 } = await import('../history.js')
 
@@ -97,7 +97,7 @@ describe('history retention', () => {
     recordSample(reading({ lastUpdated: new Date(base).toISOString(), loadPower: 555 }))
     recordSample(reading({ lastUpdated: new Date(base + 25 * 3600000).toISOString(), loadPower: 666 }))
     recordSample(reading({ lastUpdated: new Date(base + 27 * 3600000).toISOString(), loadPower: 777 }))
-    expect(getHistoryAll().map((sample) => sample.loadPower)).toEqual([666, 777])
+    expect(getRecentHistory().map((sample) => sample.loadPower)).toEqual([666, 777])
     expect(getHistory({ since: base }).map((sample) => sample.loadPower)).toEqual([555, 666, 777])
   })
 })
