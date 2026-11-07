@@ -48,7 +48,10 @@ Copy `.env.example` to `.env`. Every value has a default. These are seeds for th
 | `HOMEKIT_PIN`             | `516-35-163`                 | HomeKit pairing PIN                                                                                                                                                 |
 | `HOMEKIT_PORT`            | `51826`                      | HAP server port                                                                                                                                                     |
 | `HOMEKIT_BIND`            | _(all interfaces)_           | Limit the HomeKit advertisement to one interface/IP (e.g. `eth0`)                                                                                                   |
+| `HOMEKIT_POWER_UNIT`      | `kilowatts`                  | Apple Home power readings in `kilowatts` or `watts`                                                                                                                 |
 | `GOOGLE_AUTH_TOKEN`       | _(random until you set one)_ | Google bearer and OAuth client secret; set a long random value                                                                                                      |
+| `GOOGLE_POWER_UNIT`       | `watts`                      | Google Home power readings in `watts`, `kilowatts`, or `hidden`                                                                                                     |
+| `GOOGLE_BATTERY_DISPLAY`  | `tile`                       | Google Home battery as a battery tile (`tile`) or a temperature-tile number (`reading`)                                                                             |
 | `CLOUDFLARE_TUNNEL_TOKEN` | _(empty)_                    | Token for the `cloudflared` sidecar                                                                                                                                 |
 | `DATA_DIR`                | `./data` (Docker: `/data`)   | Pairing state and saved settings                                                                                                                                    |
 
