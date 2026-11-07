@@ -9,10 +9,36 @@ const CHROME_BIN = process.env.CHROME_BIN
 const FRAME_COUNT = Number(process.env.WALKTHROUGH_FRAMES || 40)
 const FRAME_MS = Number(process.env.WALKTHROUGH_FRAME_MS || 1400)
 
-const W = 1280
-const H = 800
+const DEVICES = {
+  desktop: {
+    width: 1280,
+    height: 800,
+    park: [640, 60],
+    touch: false,
+    blinkSettings: '--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4',
+    media: [
+      { name: 'hover', value: 'hover' }, { name: 'any-hover', value: 'hover' },
+      { name: 'pointer', value: 'fine' }, { name: 'any-pointer', value: 'fine' }
+    ]
+  },
+  tablet: {
+    width: 1194,
+    height: 834,
+    park: [597, 60],
+    touch: true,
+    blinkSettings: '--blink-settings=primaryHoverType=1,availableHoverTypes=1,primaryPointerType=2,availablePointerTypes=2',
+    media: [
+      { name: 'hover', value: 'none' }, { name: 'any-hover', value: 'none' },
+      { name: 'pointer', value: 'coarse' }, { name: 'any-pointer', value: 'coarse' }
+    ]
+  }
+}
+
+const DEVICE = DEVICES[process.env.WALKTHROUGH_DEVICE || 'desktop']
+if (!DEVICE) throw new Error(`unknown WALKTHROUGH_DEVICE "${process.env.WALKTHROUGH_DEVICE}"; use desktop or tablet`)
+const { width: W, height: H, park: PARK } = DEVICE
 const DT = 1000 / 60
-const PARK = [640, 60]
+const COMMAND_TIMEOUT_MS = 30000
 const HOVER_REST = 500
 const END_HOLD_MS = 1600
 const DASHBOARD_VIEW = { trends: false, mode: 'live', layout: 'combined', range: '1h', hidden: [] }
@@ -22,19 +48,20 @@ const run = async () => {
   const real = await getJson('/api/state')
   const frames = buildFrames(real)
   const origin = await startLoopback({ frames, settings: sanitize(await getJson('/api/settings')) })
-  const b = await launch({ bin: CHROME_BIN, port: 9412, args: CHROME_ARGS })
+  const b = await launch({ bin: CHROME_BIN, port: 9412, args: [...CHROME_ARGS, DEVICE.blinkSettings, 'about:blank'] })
   const { targetId } = await b.send('Target.createTarget', { url: 'about:blank', enableBeginFrameControl: true, width: W, height: H })
   const { sessionId } = await b.send('Target.attachToTarget', { targetId, flatten: true })
   const s = (method, params) => b.send(method, params, sessionId)
   await s('Page.enable')
   await s('Runtime.enable')
+  await s('Network.enable')
+  b.on((message) => trackRequest(message))
   await s('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: 2, mobile: false })
   await s('Emulation.setTimezoneOverride', { timezoneId: TIMEZONE })
-  await s('Emulation.setEmulatedMedia', { features: [
-    { name: 'hover', value: 'hover' }, { name: 'any-hover', value: 'hover' },
-    { name: 'pointer', value: 'fine' }, { name: 'any-pointer', value: 'fine' }
-  ] })
-  for (const [fn, arg] of [[seedPage, { frames, frameMs: FRAME_MS, view: DASHBOARD_VIEW }], [installMacCursor, { arrow: ARROW, hand: HAND }], [installPins, null]]) {
+  await s('Emulation.setTouchEmulationEnabled', { enabled: DEVICE.touch, maxTouchPoints: DEVICE.touch ? 5 : 1 })
+  await s('Emulation.setEmulatedMedia', { features: DEVICE.media })
+  const pointerOverlay = DEVICE.touch ? [installFinger, null] : [installMacCursor, { arrow: ARROW, hand: HAND }]
+  for (const [fn, arg] of [[seedPage, { frames, frameMs: FRAME_MS, view: DASHBOARD_VIEW }], pointerOverlay, [installPins, null]]) {
     await s('Page.addScriptToEvaluateOnNewDocument', { source: `(${fn})(${JSON.stringify(arg)})` })
   }
   const driver = createDriver({ b, s, sessionId })
@@ -51,13 +78,14 @@ const run = async () => {
 }
 
 const tour = async ({ hold, hoverOn, clickOn, glide, pumpUntil, sweep, mark }) => {
+  const fullscreenBack = DEVICE.touch ? visible('[aria-label="Back to dashboard"]') : FULLSCREEN_BACK
   await mark('dashboard')
   await hold(500)
   await hoverOn(tile('Home'), { rest: 450 })
   await clickOn(tile('Solar Production'))
-  await pumpUntil(FULLSCREEN_BACK, 3000, 'solar fullscreen')
+  await pumpUntil(fullscreenBack, 3000, 'solar fullscreen')
   await hold(1800)
-  await clickOn(FULLSCREEN_BACK, { rest: 450 })
+  await clickOn(fullscreenBack, { rest: 450 })
   await pumpUntil(tile('Solar Production'), 3000, 'dashboard')
   await hold(400)
 
@@ -126,6 +154,7 @@ const createDriver = ({ b, s, sessionId }) => {
   let ticks = realTicks()
   let n = 0
   let recording = false
+  let touching = false
 
   const ev = async (expression) => {
     const reply = await s('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })
@@ -133,17 +162,21 @@ const createDriver = ({ b, s, sessionId }) => {
     return reply.result.value
   }
 
+  const dispatch = (event) => event.touch
+    ? s('Input.dispatchTouchEvent', { type: event.touch, touchPoints: event.touch === 'touchEnd' ? [] : [{ x: mouse.x, y: mouse.y }] })
+    : s('Input.dispatchMouseEvent', { x: mouse.x, y: mouse.y, ...event })
+
   const step = async (events = []) => {
     if (clock.virtual) await advanceVirtualTime({ b, s })
     ticks += DT
-    const inputs = events.map((e) => s('Input.dispatchMouseEvent', { x: mouse.x, y: mouse.y, ...e }))
+    if (DEVICE.touch) await ev(`window.__finger && window.__finger(${mouse.x}, ${mouse.y})`)
+    events.forEach((event) => dispatch(event).catch((error) => console.log(`  input failed: ${error.message}`)))
     const frame = await b.send('HeadlessExperimental.beginFrame', {
       frameTimeTicks: ticks,
       interval: DT,
       noDisplayUpdates: false,
       ...(recording ? { screenshot: { format: 'jpeg', quality: 92 } } : {})
     }, sessionId)
-    await Promise.all(inputs)
     if (!clock.virtual) await new Promise((done) => setTimeout(done, 16))
     if (!recording || !frame.screenshotData) return
     await writeFile(`${OUT}/${String(n).padStart(5, '0')}.jpg`, Buffer.from(frame.screenshotData, 'base64'))
@@ -160,6 +193,11 @@ const createDriver = ({ b, s, sessionId }) => {
     throw new Error(`timed out waiting for ${label}`)
   }
 
+  const moveEvent = () => {
+    if (!DEVICE.touch) return [{ type: 'mouseMoved' }]
+    return touching ? [{ touch: 'touchMove' }] : []
+  }
+
   const glide = async ([tx, ty], ms) => {
     const [fx, fy] = [mouse.x, mouse.y]
     const distance = Math.hypot(tx - fx, ty - fy)
@@ -169,7 +207,7 @@ const createDriver = ({ b, s, sessionId }) => {
       const p = easeInOut(i / frames)
       mouse.x = fx + (tx - fx) * p
       mouse.y = fy + (ty - fy) * p
-      await step([{ type: 'mouseMoved' }])
+      await step(moveEvent())
     }
   }
 
@@ -186,8 +224,15 @@ const createDriver = ({ b, s, sessionId }) => {
 
   const press = async () => {
     await hold(100)
-    await step([{ type: 'mousePressed', button: 'left', clickCount: 1 }])
-    await step([{ type: 'mouseReleased', button: 'left', clickCount: 1 }])
+    if (!DEVICE.touch) {
+      await step([{ type: 'mousePressed', button: 'left', clickCount: 1 }])
+      await step([{ type: 'mouseReleased', button: 'left', clickCount: 1 }])
+      return
+    }
+    await ev(`window.__tapRipple(${mouse.x}, ${mouse.y})`)
+    await step([{ touch: 'touchStart' }])
+    await hold(50)
+    await step([{ touch: 'touchEnd' }])
   }
 
   const clickOn = async (expression, options = {}) => {
@@ -199,7 +244,14 @@ const createDriver = ({ b, s, sessionId }) => {
     const [x0, y] = await centreOf(STAGE, { fx: from, fy: 0.45 })
     const [x1] = await centreOf(STAGE, { fx: to, fy: 0.45 })
     await glide([x0, y])
+    if (!DEVICE.touch) return glide([x1, y], ms)
+    await ev(`window.__fingerDown(true)`)
+    await step([{ touch: 'touchStart' }])
+    touching = true
     await glide([x1, y], ms)
+    touching = false
+    await step([{ touch: 'touchEnd' }])
+    await ev(`window.__fingerDown(false)`)
   }
 
   const mark = async (label) => {
@@ -212,7 +264,7 @@ const createDriver = ({ b, s, sessionId }) => {
     await pumpUntil(tile('Solar Production'), 30000, 'dashboard')
     await ev('document.fonts.load(\'600 32px "Inter Variable"\')')
     await pumpUntil('document.fonts.check(\'600 32px "Inter Variable"\')', 9000, 'Inter')
-    await step([{ type: 'mouseMoved' }])
+    await step(moveEvent())
     await hold(1500)
     await s('Emulation.setVirtualTimePolicy', { policy: 'pause' })
     ticks = Math.max(ticks, realTicks())
@@ -240,9 +292,16 @@ const createDriver = ({ b, s, sessionId }) => {
 
 const advanceVirtualTime = async ({ b, s }) => {
   const expired = b.once('Emulation.virtualTimeBudgetExpired')
-  await s('Emulation.setVirtualTimePolicy', { policy: 'pauseIfNetworkFetchesPending', budget: DT })
-  const stalled = new Promise((_, reject) => setTimeout(() => reject(new Error('virtual time stalled for 20 s')), 20000).unref())
+  await s('Emulation.setVirtualTimePolicy', { policy: 'advance', budget: DT })
+  const stalled = new Promise((_, reject) => setTimeout(() => reject(new Error(`virtual time stalled for 20 s; in flight: ${[...inFlight.values()].join(', ') || 'none'}`)), 20000).unref())
   await Promise.race([expired, stalled])
+}
+
+const inFlight = new Map()
+
+const trackRequest = ({ method, params }) => {
+  if (method === 'Network.requestWillBeSent') inFlight.set(params.requestId, params.request.url)
+  if (method === 'Network.loadingFinished' || method === 'Network.loadingFailed') inFlight.delete(params.requestId)
 }
 
 const startLoopback = ({ frames, settings }) => new Promise((resolve) => {
@@ -254,14 +313,32 @@ const startLoopback = ({ frames, settings }) => new Promise((resolve) => {
   }
   const server = http.createServer(async (request, response) => {
     const path = request.url.split('?')[0]
+    if (process.env.WALKTHROUGH_DEBUG) {
+      const started = Date.now()
+      console.log(`  -> ${request.url}`)
+      response.on('finish', () => console.log(`  <- ${response.statusCode} ${request.url} ${Date.now() - started} ms`))
+      response.on('close', () => { if (!response.writableFinished) console.log(`  xx closed early ${request.url}`) })
+    }
     if (!['GET', 'HEAD'].includes(request.method)) return send(response, 405, 'text/plain', 'read-only capture')
     if (stubs[path]) return send(response, 200, 'application/json', JSON.stringify(stubs[path]))
-    const upstream = await fetch(BASE + request.url).catch(() => null)
+    const upstream = await forward(request.url)
     if (!upstream) return send(response, 502, 'text/plain', 'upstream unreachable')
-    send(response, upstream.status, upstream.headers.get('content-type'), Buffer.from(await upstream.arrayBuffer()))
+    send(response, upstream.status, upstream.type, upstream.body)
   })
   server.listen(0, '127.0.0.1', () => resolve(`http://127.0.0.1:${server.address().port}`))
 })
+
+const forward = async (url, attempts = 3) => {
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      const upstream = await fetch(BASE + url, { signal: AbortSignal.timeout(10000) })
+      return { status: upstream.status, type: upstream.headers.get('content-type'), body: Buffer.from(await upstream.arrayBuffer()) }
+    } catch (error) {
+      console.log(`  upstream ${url} failed (${error.message}), attempt ${attempt} of ${attempts}`)
+    }
+  }
+  return null
+}
 
 const send = (response, status, type, body) => {
   response.writeHead(status, { 'content-type': type || 'application/octet-stream', 'cache-control': 'no-store' })
@@ -291,7 +368,13 @@ const launch = async ({ bin, port, args }) => {
   })
   const sendCommand = (method, params = {}, sessionId) => new Promise((resolve, reject) => {
     const n = ++id
-    pending.set(n, { resolve, reject })
+    const timer = setTimeout(() => {
+      pending.delete(n)
+      reject(new Error(`${method} got no reply in ${COMMAND_TIMEOUT_MS / 1000} s`))
+    }, COMMAND_TIMEOUT_MS)
+    timer.unref()
+    const settle = (fn) => (value) => { clearTimeout(timer); fn(value) }
+    pending.set(n, { resolve: settle(resolve), reject: settle(reject) })
     socket.send(JSON.stringify({ id: n, method, params, sessionId }))
   })
   const once = (method) => new Promise((resolve) => {
@@ -302,15 +385,14 @@ const launch = async ({ bin, port, args }) => {
     }
     listeners.push(listener)
   })
+  const on = (listener) => listeners.push(listener)
   const close = () => { socket.close(); proc.kill() }
-  return { send: sendCommand, once, close }
+  return { send: sendCommand, once, on, close }
 }
 
 const CHROME_ARGS = [
   '--headless', '--no-sandbox', '--enable-begin-frame-control', '--run-all-compositor-stages-before-draw',
-  '--deterministic-mode', '--force-device-scale-factor=2', '--hide-scrollbars', '--font-render-hinting=none',
-  '--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4',
-  'about:blank'
+  '--deterministic-mode', '--force-device-scale-factor=2', '--hide-scrollbars', '--font-render-hinting=none'
 ]
 
 const buildFrames = (real) => {
@@ -445,6 +527,53 @@ const installPins = () => {
   const watch = () => new MutationObserver(enforce).observe(document.documentElement, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['class'] })
   if (document.documentElement) watch()
   else document.addEventListener('DOMContentLoaded', watch, { once: true })
+}
+
+const installFinger = () => {
+  const install = () => {
+    const style = document.createElement('style')
+    style.textContent = `
+      ::-webkit-scrollbar { width: 0 !important; height: 0 !important }
+      html, body, * { scrollbar-width: none !important }
+      #__finger-layer { position: fixed; inset: 0; pointer-events: none; z-index: 2147483647 }
+      #__finger {
+        position: fixed; left: 0; top: 0; width: 28px; height: 28px; margin: -14px 0 0 -14px;
+        transform: translate(-80px, -80px); z-index: 2; will-change: transform;
+      }
+      #__finger > span {
+        display: block; width: 100%; height: 100%; border-radius: 50%;
+        background: rgba(255,255,255,0.45); border: 1px solid rgba(255,255,255,0.9);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.35); transition: transform 180ms ease;
+      }
+      #__finger.down > span { transform: scale(0.85) }
+      .__tap { position: fixed; width: 84px; height: 84px; margin: -42px 0 0 -42px; border-radius: 50%; box-sizing: border-box; z-index: 1 }
+      .__tap-core { border: 5px solid rgba(108,142,222,0.95); animation: __tap-core 620ms cubic-bezier(0.22,0.61,0.36,1) forwards }
+      .__tap-wave { border: 3px solid rgba(108,142,222,0.55); animation: __tap-wave 620ms cubic-bezier(0.22,0.61,0.36,1) forwards }
+      @keyframes __tap-core { 0% { transform: scale(0.5); opacity: 0 } 16% { transform: scale(1); opacity: 1 } 62% { transform: scale(1); opacity: 1 } 100% { transform: scale(1); opacity: 0 } }
+      @keyframes __tap-wave { 0% { transform: scale(1); opacity: 0 } 16% { transform: scale(1); opacity: 0.6 } 100% { transform: scale(2.2); opacity: 0 } }`
+    document.head.append(style)
+    const layer = document.createElement('div')
+    layer.id = '__finger-layer'
+    layer.innerHTML = '<div id="__finger"><span></span></div>'
+    document.documentElement.append(layer)
+    const finger = layer.firstChild
+    window.__finger = (x, y) => { finger.style.transform = `translate(${x}px, ${y}px)` }
+    window.__fingerDown = (down) => finger.classList.toggle('down', down)
+    window.__tapRipple = (x, y) => {
+      finger.classList.add('down')
+      setTimeout(() => finger.classList.remove('down'), 220)
+      for (const variant of ['__tap-core', '__tap-wave']) {
+        const ring = document.createElement('span')
+        ring.className = `__tap ${variant}`
+        ring.style.left = `${x}px`
+        ring.style.top = `${y}px`
+        layer.append(ring)
+        setTimeout(() => ring.remove(), 700)
+      }
+    }
+  }
+  if (document.head && document.body) install()
+  else document.addEventListener('DOMContentLoaded', install, { once: true })
 }
 
 const installMacCursor = ({ arrow, hand }) => {

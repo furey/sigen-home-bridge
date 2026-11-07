@@ -43,7 +43,7 @@
 
 ## Demo
 
-<https://github.com/user-attachments/assets/a0528a07-1f64-4c74-abd1-9bd41bf165bc>
+<https://github.com/user-attachments/assets/887a51bc-2f9d-4754-851f-9689c6f6f0e9>
 
 ## What `sigen-home-bridge` is
 
