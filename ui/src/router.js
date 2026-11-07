@@ -1,6 +1,6 @@
 import { START_LOCATION, createRouter, createWebHistory } from 'vue-router'
 import { metricBySlug } from './lib/metrics.js'
-import { beginReveal } from './lib/revealArrival.js'
+import { beginReveal, cancelReveal } from './lib/revealArrival.js'
 import { isSwipeBack, watchSwipeBack } from './lib/swipeBack.js'
 import { useSettings } from './composables/useSettings.js'
 import { useDashboardView } from './composables/useDashboardView.js'
@@ -77,7 +77,7 @@ router.beforeEach(async (to, from) => {
 router.afterEach((to, from, failure) => {
   const swipedBack = isSwipeBack({ isPop: navigationIsPop })
   navigationIsPop = false
-  if (failure || swipedBack) return
+  if (failure || swipedBack) return cancelReveal()
   beginReveal()
 })
 
