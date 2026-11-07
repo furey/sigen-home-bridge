@@ -9,8 +9,10 @@ logs
 coverage
 tmp
 walkthrough.mp4
-walkthrough.webm
+walkthrough-1x.mp4
 walkthrough.jpg
+docs/public/demo.mp4
+docs/public/demo-poster.jpg
 docs/public/og-a.png
 docs/public/og-b.png
 fail.png

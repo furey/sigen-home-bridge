@@ -77,7 +77,7 @@ onMounted(() => {
 
 .tablet__screen {
   position: relative;
-  aspect-ratio: 1194 / 834;
+  aspect-ratio: 1280 / 800;
   width: 100%;
   border-radius: 13px;
   overflow: hidden;

@@ -5,8 +5,8 @@
   "type": "module",
   "description": "VitePress documentation site for sigen-home-bridge.",
   "scripts": {
-    "dev": "vitepress dev",
-    "build": "vitepress build",
+    "dev": "bash ../scripts/fetch-docs-media.sh && vitepress dev",
+    "build": "bash ../scripts/fetch-docs-media.sh && vitepress build",
     "preview": "vitepress preview"
   },
   "devDependencies": {

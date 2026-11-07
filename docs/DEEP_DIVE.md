@@ -463,7 +463,7 @@ Chromium launches with `--font-render-hinting=none`. Headless Linux Chromium oth
 
 ## Recording the walkthrough video
 
-`scripts/capture-walkthrough.sh` (`npm run walkthrough`) records the screen tour linked from the README. It runs the same Playwright Docker image as the screenshots, drives one tablet session (1194×834, touch, 2× scale) through the app, records a `.webm`, then converts it to `walkthrough.mp4` on the host with ffmpeg (H.264 high profile, `crf 28`, `preset slow`, `yuv420p`, faststart, no audio). The capture stays at its native 1194×834; Playwright records the screencast at CSS-pixel resolution and pads a larger canvas rather than upscaling, so there is nothing to gain from a wider encode. `crf 28` with the slow preset keeps a ~45-second tour well under 1.5 MB. Both files are gitignored; the mp4 is an upload artifact, not a committed asset, so ffmpeg has to be on the host alongside Docker.
+`scripts/capture-walkthrough.sh` (`npm run walkthrough`) records the screen tour that plays in the README and on the documentation home page. It runs `chrome-headless-shell` from the Playwright Docker image and drives it over the Chrome DevTools Protocol, frame by frame: the page runs on virtual time, and each frame advances the clock by 1/60 s and then renders with `HeadlessExperimental.beginFrame`. Every frame is rendered on schedule, so the video plays at a steady 60 fps however slow the machine is. Real-time recorders only keep the frames Chrome manages to paint, which gives a choppy result. The frames land in `tmp/walkthrough-frames/`, and ffmpeg on the host encodes them (H.264 high profile, `crf 22`, `preset slow`, `yuv420p`, keyframes every 2 s, faststart, no audio) into `walkthrough.mp4` (2560×1600), `walkthrough-1x.mp4` (1280×800), and a `walkthrough.jpg` poster. All three are gitignored. ffmpeg, `gh`, and `jq` have to be on the host alongside Docker.
 
 Point it at an instance carrying live history, the same as the screenshots:
 
@@ -471,11 +471,13 @@ Point it at an instance carrying live history, the same as the screenshots:
 SIGEN_URL=http://bridge.lan:5163 npm run walkthrough
 ```
 
-The tour lands on the dashboard, opens the fullscreen solar metric, the cost view, the device breakdown, and the trends chart, then steps through the theme, gateway, and Apple Home settings before returning to the dashboard. A translucent finger dot glides to each target and compresses as it presses, with the double-ring ripple firing underneath, so the recording reads as touch input with continuous motion and no mouse cursor. The dot and ripple both live in a fixed overlay injected before the app boots. The tour opens and closes on the same dashboard view with the dot parked at the same spot, so the clip loops without a visible seam for any future embed.
+The tour runs at 1280×800 with a mouse. It opens on the dashboard, opens the fullscreen solar metric, then works through the trends chart: Now, Day, the previous day, Week (where it clicks a day's bars to open that day), and the Lanes layout. It then visits the device breakdown, steps through the Theme and Apple Home settings, and returns to the dashboard. The real mouse moves along straight, eased paths, one event per frame, so hover styles and the chart's scrub readout respond as they would for a person. An in-page sprite traced from the macOS arrow and pointing hand draws the cursor, and it shows the hand over anything clickable. The page reveal plays between views. The tour opens and closes on the same dashboard frame: the readings rewind to their first sample before the end, and the footer clock, the battery estimate, and the cost figure are held at their opening values, so the clip loops without a seam.
 
-The readings move on camera. `capture-walkthrough.mjs` precomputes a run of energy-balanced frames (solar ramping up, the battery charging, SoC climbing, grid export growing, home load wobbling, a Smart Port hot water draw holding near 3.6 kW) and a stubbed `EventSource` emits one every 1.4 seconds, so solar, battery, grid, and SoC tick the whole way through. The settings stub also stages **Show Smart Port on the dashboard**, so the Home tile carries the combined draw and the device breakdown shows the load's card whether or not the target instance has the switch on. The Home-tile cost and the cost view come from history and the tariff rather than the live state, so they hold steady; that is expected. The gateway host, HomeKit PIN, advertise address, inverter serial, and outdoor location are swapped for placeholders before they reach the recording, the same redactions the screenshots make.
+The readings move on camera. `capture-walkthrough.mjs` precomputes a run of energy-balanced samples (solar ramping up, the battery charging, SoC climbing, grid export growing, home load wobbling, a Smart Port hot water draw holding near 3.6 kW), and a stubbed `EventSource` emits one every 1.4 seconds of virtual time. A read-only server inside the container sits between Chrome and `SIGEN_URL`: it serves the stubbed state, a stubbed unlocked session, the redacted settings, and an empty HomeKit pairing, forwards every other `GET` (the app, the history behind the trends chart), and refuses anything that writes. The settings stub also stages **Show Smart Port on the dashboard**, so the Home tile carries the combined draw and the device breakdown shows the load's card whether or not the target instance has the switch on. The gateway host, HomeKit PIN, advertise address, inverter serial, string names, and outdoor location are swapped for placeholders before they reach the recording, the same redactions the screenshots make.
 
-The script times its own settle (boot, font load, and the first parked frame) and prints `TOUR_TRIM`; the shell reads that line and trims exactly that many seconds off the head, so the clip opens on a fully rendered dashboard instead of a half-loaded frame. `WALKTHROUGH_TRIM_HEAD` overrides the measurement when you need a manual value. `WALKTHROUGH_FRAMES` and `WALKTHROUGH_FRAME_MS` retune the data sequence; `WALKTHROUGH_TZ` overrides the timezone; `WALKTHROUGH_POSTER=1` also writes a `walkthrough.jpg` poster from the same trimmed head. To publish, drag the mp4 into a GitHub issue or PR comment and paste the attachment URL into the README's Demo section.
+After encoding, the shell publishes both copies. `scripts/upload-walkthrough.sh` uploads the 2x master to GitHub's user-attachments store and rewrites the README's Demo line to the new URL; GitHub plays a bare user-attachments URL on its own line as an inline video. It uses the same unofficial endpoint as drag-and-drop in the web UI, authenticated with `gh auth token`; if GitHub retires it, drag the mp4 into an issue or PR comment and paste the URL it gives into the README. Each upload gets a new URL, and old uploads can't be listed or deleted. The shell then copies the 1x video and the poster to `docs/public/demo.mp4` and `docs/public/demo-poster.jpg`, and `scripts/upload-docs-media.sh` uploads them to the `media` GitHub release and starts a docs deploy. Commit README.md afterwards to publish the new Demo URL. `WALKTHROUGH_UPLOAD=0` skips both uploads, and `DOCS_MEDIA_DEPLOY=0` uploads the docs media without a deploy. `WALKTHROUGH_FRAMES` and `WALKTHROUGH_FRAME_MS` retune the data sequence, `WALKTHROUGH_TZ` overrides the timezone, and `WALKTHROUGH_CRF` overrides the encode quality.
+
+The documentation site's demo video and poster are not in git. They are assets of the `media` GitHub release, listed in `scripts/docs-media.txt`, and `scripts/fetch-docs-media.sh` downloads them into `docs/public/` before every docs build (`npm run dev` and `npm run build` in `docs/` run it first). The repository has immutable releases switched on, and an immutable release refuses new assets, so `media` was created while the setting was off and stays mutable. Never delete and recreate it with the setting on.
 
 ## Generating the social card
 
@@ -546,17 +548,17 @@ sigen-home-bridge/
 
 Run from the repository root.
 
-| Script                | Action                                                             |
-| --------------------- | ------------------------------------------------------------------ |
-| `npm run install:all` | Install root, server, and UI dependencies                          |
-| `npm run dev`         | Run the bridge and the Vite dev server together                    |
-| `npm run build`       | Build the UI into `ui/dist`                                        |
-| `npm start`           | Start the bridge (serves the built UI)                             |
-| `npm test`            | Run the server and UI unit tests                                   |
-| `npm run probe`       | Read the gateway once and print decoded values                     |
-| `npm run screenshots` | Recapture the README screenshots (Docker + Playwright)             |
-| `npm run walkthrough` | Record the README walkthrough video (Docker + Playwright + ffmpeg) |
-| `npm run og`          | Regenerate the docs social preview card (Docker + Playwright)      |
+| Script                | Action                                                                       |
+| --------------------- | ---------------------------------------------------------------------------- |
+| `npm run install:all` | Install root, server, and UI dependencies                                    |
+| `npm run dev`         | Run the bridge and the Vite dev server together                              |
+| `npm run build`       | Build the UI into `ui/dist`                                                  |
+| `npm start`           | Start the bridge (serves the built UI)                                       |
+| `npm test`            | Run the server and UI unit tests                                             |
+| `npm run probe`       | Read the gateway once and print decoded values                               |
+| `npm run screenshots` | Recapture the README screenshots (Docker + Playwright)                       |
+| `npm run walkthrough` | Record and publish the walkthrough video (Docker + headless Chrome + ffmpeg) |
+| `npm run og`          | Regenerate the docs social preview card (Docker + Playwright)                |
 
 ## Verifying the gateway
 
