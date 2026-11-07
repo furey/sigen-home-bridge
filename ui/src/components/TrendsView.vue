@@ -4,7 +4,7 @@ import { useStateStream } from '../composables/useStateStream.js'
 import { useHistory } from '../composables/useHistory.js'
 import { TREND_MODES, TREND_RANGES, rangeFor, useDashboardView } from '../composables/useDashboardView.js'
 import { calendarLabel, calendarTicks, calendarWindow, dayBounds } from '../lib/trendWindow.js'
-import { ChartLine, ChevronLast, ChevronLeft, ChevronRight, Clock, History, Rows3 } from '@lucide/vue'
+import { ChartLine, ChartSpline, ChevronLast, ChevronLeft, ChevronRight, Clock, History, Rows3 } from '@lucide/vue'
 import { useHoverCapable } from '../composables/useHoverCapable.js'
 import { useScrub } from '../composables/useScrub.js'
 import { useSettings } from '../composables/useSettings.js'
@@ -17,6 +17,8 @@ import { skyGradientStops, sunCrossings } from '../lib/sun.js'
 
 const { state } = useStateStream()
 const { samples } = useHistory()
+const emit = defineEmits(['close'])
+
 const { view, setRange, setMode, setLayout, toggleMetric } = useDashboardView()
 const { data: settings } = useSettings()
 const hoverCapable = useHoverCapable()
@@ -1104,21 +1106,36 @@ watch([() => visible.value.length, windowReady, () => panEnd.value], () => {
 <template>
   <section v-reveal class="trends-section flex flex-col gap-3 rounded-2xl phone-bleed bg-zinc-900 p-4 ring-1 ring-zinc-800 sm:p-5">
     <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-      <div
-        class="flex w-full gap-0.5 rounded-xl bg-zinc-950/60 p-1 ring-1 ring-zinc-800 sm:w-auto"
-        role="group"
-        aria-label="Trends period"
-      >
+      <div class="flex w-full items-center gap-4 sm:w-auto">
         <button
-          v-for="mode in TREND_MODES"
-          :key="mode.key"
-          class="h-9 flex-1 rounded-lg px-4 text-sm font-medium transition sm:flex-none"
-          :class="mode.key === view.mode ? 'bg-zinc-700 text-zinc-50' : 'text-zinc-400 hover:text-zinc-200'"
-          :aria-pressed="mode.key === view.mode"
-          @click="pickMode(mode.key)"
+          class="trends-close items-center gap-2 text-zinc-50 transition"
+          role="switch"
+          aria-checked="true"
+          aria-label="Toggle trends view"
+          title="Toggle trends view"
+          @click="emit('close')"
         >
-          {{ mode.label }}
+          <span class="relative h-4 w-7 shrink-0 rounded-full bg-zinc-300">
+            <span class="absolute left-3.5 top-0.5 h-3 w-3 rounded-full bg-zinc-950"></span>
+          </span>
+          <ChartSpline class="h-4 w-4" />
         </button>
+        <div
+          class="flex w-full gap-0.5 rounded-xl bg-zinc-950/60 p-1 ring-1 ring-zinc-800 sm:w-auto"
+          role="group"
+          aria-label="Trends period"
+        >
+          <button
+            v-for="mode in TREND_MODES"
+            :key="mode.key"
+            class="h-9 flex-1 rounded-lg px-4 text-sm font-medium transition sm:flex-none"
+            :class="mode.key === view.mode ? 'bg-zinc-700 text-zinc-50' : 'text-zinc-400 hover:text-zinc-200'"
+            :aria-pressed="mode.key === view.mode"
+            @click="pickMode(mode.key)"
+          >
+            {{ mode.label }}
+          </button>
+        </div>
       </div>
       <div v-if="isLive" class="flex items-center gap-1 max-sm:w-full max-sm:justify-center" role="group" aria-label="Range">
         <button
@@ -1507,10 +1524,23 @@ watch([() => visible.value.length, windowReady, () => panEnd.value], () => {
 </template>
 
 <style scoped>
+.trends-close {
+  display: none;
+}
+
 @media (orientation: landscape) and (max-height: 480px) and (hover: none) and (pointer: coarse) {
+  .trends-close {
+    display: flex;
+  }
+
   .trends-section {
     gap: 0.5rem;
-    padding: 0.5rem 1rem;
+    padding: max(0.5rem, env(safe-area-inset-top)) calc(1rem + env(safe-area-inset-right))
+      max(0.5rem, env(safe-area-inset-bottom)) calc(1rem + env(safe-area-inset-left));
+    margin-right: 0;
+    margin-left: 0;
+    border-radius: 0;
+    box-shadow: none;
   }
 
   .trends-readout {
