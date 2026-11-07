@@ -46,7 +46,8 @@ sigen-home-bridge/
 │   └── src/
 │       ├── App.vue
 │       ├── router.js
-│       ├── lib/         metrics.js, help.js, tariff.js, alertValidation.js
+│       ├── lib/         metrics.js, help.js, tariff.js, trendWindow.js, pageReveal.js, … (+ Vitest tests)
+│       ├── directives/  reveal.js (staggered page reveal)
 │       ├── composables/ useStateStream, useHistory, useSettings, useDashboardView, …
 │       ├── public/      favicon set
 │       └── components/  Dashboard, TrendsView, MetricFullscreen, Settings, SetupWizard, InfoTip
@@ -69,7 +70,7 @@ Run from the repository root.
 | `npm run dev`         | Run the bridge and the Vite dev server together                    |
 | `npm run build`       | Build the UI into `ui/dist`                                        |
 | `npm start`           | Start the bridge (serves the built UI)                             |
-| `npm test`            | Run the server unit tests                                          |
+| `npm test`            | Run the server and UI unit tests                                   |
 | `npm run probe`       | Read the gateway once and print decoded values                     |
 | `npm run screenshots` | Recapture the README screenshots (Docker + Playwright)             |
 | `npm run walkthrough` | Record the README walkthrough video (Docker + Playwright + ffmpeg) |
