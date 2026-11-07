@@ -74,6 +74,14 @@ router.beforeEach(async (to, from) => {
 })
 
 router.afterEach((to, from, failure) => {
-  if (failure) return
+  const swipedBack = navigationIsPop && isTouchScreen()
+  navigationIsPop = false
+  if (failure || swipedBack) return
   beginReveal()
 })
+
+let navigationIsPop = false
+
+router.options.history.listen((to, from, info) => { navigationIsPop = info.type === 'pop' })
+
+const isTouchScreen = () => window.matchMedia('(hover: none)').matches
