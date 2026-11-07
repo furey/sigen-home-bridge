@@ -76,19 +76,14 @@ export const latestArrival = () => arrival
 
 let arrival = null
 
-let navigationIsPop = false
-
-router.options.history.listen((to, from, info) => { navigationIsPop = info.type === 'pop' })
-
 router.afterEach((to, from, failure) => {
   arrival = {
-    fresh: !navigationIsPop && !failure,
+    fresh: !failure,
     at: performance.now(),
     revealed: false,
     sameView: sameViewOf(to, from),
     view: String(to.name)
   }
-  navigationIsPop = false
 })
 
 const sameViewOf = (to, from) =>
