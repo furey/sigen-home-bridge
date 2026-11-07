@@ -1,6 +1,7 @@
 import { START_LOCATION, createRouter, createWebHistory } from 'vue-router'
 import { metricBySlug } from './lib/metrics.js'
 import { beginReveal } from './lib/revealArrival.js'
+import { isSwipeBack, watchSwipeBack } from './lib/swipeBack.js'
 import { useSettings } from './composables/useSettings.js'
 import { useDashboardView } from './composables/useDashboardView.js'
 import Dashboard from './components/Dashboard.vue'
@@ -74,7 +75,7 @@ router.beforeEach(async (to, from) => {
 })
 
 router.afterEach((to, from, failure) => {
-  const swipedBack = navigationIsPop && isTouchScreen()
+  const swipedBack = isSwipeBack({ isPop: navigationIsPop })
   navigationIsPop = false
   if (failure || swipedBack) return
   beginReveal()
@@ -84,4 +85,4 @@ let navigationIsPop = false
 
 router.options.history.listen((to, from, info) => { navigationIsPop = info.type === 'pop' })
 
-const isTouchScreen = () => window.matchMedia('(hover: none)').matches
+watchSwipeBack()
