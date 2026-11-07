@@ -16,7 +16,7 @@ const PROFILES = {
 }
 
 const DASHBOARD_VIEW = { trends: false, range: '1h', hidden: [] }
-const TRENDS_VIEW = { trends: true, range: '24h', hidden: [] }
+const TRENDS_VIEW = { trends: true, mode: 'day', layout: 'combined', range: '1h', hidden: [] }
 
 const SAMPLE_SERIAL = 'SGN-2026-000123'
 const STRING_NAMES = { 1: 'North array', 2: 'East array', 3: 'Carport' }
@@ -57,10 +57,10 @@ const dataShots = [
   { profile: 'tablet', path: '/', file: 'dashboard-tablet.png', view: DASHBOARD_VIEW, inject: true },
   { profile: 'phonePortrait', path: '/', file: 'dashboard-phone-portrait.png', view: DASHBOARD_VIEW, inject: true },
   { profile: 'phoneLandscape', path: '/', file: 'dashboard-phone-landscape.png', view: DASHBOARD_VIEW, inject: true },
-  { profile: 'desktop', path: '/trends', file: 'trends-desktop.png', view: TRENDS_VIEW, prep: selectWidestRange },
-  { profile: 'tablet', path: '/trends', file: 'trends-tablet.png', view: TRENDS_VIEW, prep: selectWidestRange },
-  { profile: 'phonePortrait', path: '/trends', file: 'trends-phone-portrait.png', view: TRENDS_VIEW, prep: selectWidestRange },
-  { profile: 'phoneLandscape', path: '/trends', file: 'trends-phone-landscape.png', view: TRENDS_VIEW, prep: selectWidestRange },
+  { profile: 'desktop', path: '/trends', file: 'trends-desktop.png', view: TRENDS_VIEW, prep: showYesterday },
+  { profile: 'tablet', path: '/trends', file: 'trends-tablet.png', view: TRENDS_VIEW, prep: showYesterday },
+  { profile: 'phonePortrait', path: '/trends', file: 'trends-phone-portrait.png', view: TRENDS_VIEW, prep: showYesterday },
+  { profile: 'phoneLandscape', path: '/trends', file: 'trends-phone-landscape.png', view: TRENDS_VIEW, prep: showYesterday },
   { profile: 'desktop', path: '/metric/solar', file: 'fullscreen-solar-desktop.png', view: DASHBOARD_VIEW, inject: true },
   { profile: 'tablet', path: '/metric/solar', file: 'fullscreen-solar-tablet.png', view: DASHBOARD_VIEW, inject: true },
   { profile: 'phonePortrait', path: '/metric/solar', file: 'fullscreen-solar-phone-portrait.png', view: DASHBOARD_VIEW, inject: true },
@@ -201,9 +201,10 @@ async function sanitizeApple (page) {
   await page.evaluate(() => document.activeElement && document.activeElement.blur())
 }
 
-async function selectWidestRange (page) {
-  const pill = page.getByRole('radio', { name: '24h', exact: true })
-  if (await pill.count()) await pill.first().click({ timeout: 4000 }).catch(() => {})
+async function showYesterday (page) {
+  await page.getByText('Day totals').first().waitFor({ timeout: 9000 }).catch(() => {})
+  await page.getByRole('button', { name: 'Earlier', exact: true }).first().click({ timeout: 4000 })
+  await page.getByText('Yesterday', { exact: true }).first().waitFor({ timeout: 9000 })
   await page.waitForFunction(() => document.querySelectorAll('svg path').length > 3, { timeout: 9000 }).catch(() => {})
   await wait(page, 1000)
 }

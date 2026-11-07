@@ -531,4 +531,24 @@ const lastUpdated = computed(() =>
   }
 }
 
+@media (orientation: landscape) and (max-height: 480px) and (hover: none) and (pointer: coarse) {
+  .quadrants {
+    margin-right: calc(-1 * max(var(--safe-floor-side), env(safe-area-inset-right)));
+    margin-left: calc(-1 * max(var(--safe-floor-side), env(safe-area-inset-left)));
+  }
+
+  .quadrants > * {
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .quadrants > :nth-child(odd) {
+    padding-left: calc(0.875rem + env(safe-area-inset-left));
+  }
+
+  .quadrants > :nth-child(even) {
+    padding-right: calc(0.875rem + env(safe-area-inset-right));
+  }
+}
+
 </style>
