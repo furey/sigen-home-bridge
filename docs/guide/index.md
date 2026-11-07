@@ -23,7 +23,7 @@ It only ever *reads*. It never sends a command back to your system, so it can't 
 
 - **It's not a controller.** The bridge is read-only. It can't tell your battery to charge or flip a schedule.
 - **It's not a Home Assistant add-on.** It's a standalone service. If you already run Home Assistant, you might prefer its own Sigenergy integrations.
-- **It's not a long-term energy record.** The chart reaches back over your chosen window (7 days by default, up to 90), not years. For billing-grade history, pair it with something built for that.
+- **It's not a long-term energy record.** The chart reaches back over your chosen window (31 days by default, up to 90), not years. For billing-grade history, pair it with something built for that.
 - **It has no login of its own.** On your home network it's open on purpose, so anyone who can reach it can watch the dashboard. To reach it from outside the house, put a login wall in front of it (see [Reaching it from away](/guide/remote-access)). Don't expose the raw app to the internet.
 
 ## Is it for you?

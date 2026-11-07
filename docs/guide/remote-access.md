@@ -13,7 +13,7 @@ The readings are open by design. What you *can* lock is **changing** things.
 
 Set a passcode under **Settings → Security** and the bridge rejects every settings change that doesn't carry a valid session. So a guest on your network can watch the dashboard but can't touch your settings.
 
-Treat it as a deterrent for a shared home, not real security: there are no user accounts, the traffic is plain, and the readings stay open. Forgot the passcode? Delete `data/settings.json` (or just its `security` block) on the host and restart.
+Treat it as a deterrent for a shared home, not real security: there are no user accounts, the traffic is plain, and the readings stay open. Forgot the passcode? Delete `settings.json` (or just its `security` block) from the bridge's data folder (`/data` inside the container, which is the `sigen-data` volume under Docker) and restart.
 
 ## From outside the house
 

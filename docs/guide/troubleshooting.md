@@ -43,7 +43,7 @@ Almost everything applies live, but the Apple Home fields and the server port ar
 
 ## I changed `.env` but nothing happened
 
-`.env` only seeds the *first* boot. Once you've saved settings in the dashboard, those win. Change it in Settings instead, or use Reset to fall back to the `.env` seeds.
+`.env` only seeds the *first* boot. Once you've saved settings in the dashboard, those win. Change it in Settings instead, or use **Settings → System → Reset configuration** to fall back to the `.env` seeds (it also clears the passcode and reruns the setup wizard).
 
 ## Cloudflare Tunnel logs fill with "control stream encountered a failure"
 

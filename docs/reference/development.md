@@ -43,13 +43,13 @@ sigen-home-bridge/
 │   ├── probe.js        one-shot Modbus read for verification
 │   └── tests/          Vitest unit tests
 ├── ui/                 Vue 3 + Vite + Tailwind dashboard
+│   ├── public/          favicon set
 │   └── src/
 │       ├── App.vue
 │       ├── router.js
 │       ├── lib/         metrics.js, help.js, tariff.js, trendWindow.js, pageReveal.js, … (+ Vitest tests)
 │       ├── directives/  reveal.js (staggered page reveal)
 │       ├── composables/ useStateStream, useHistory, useSettings, useDashboardView, …
-│       ├── public/      favicon set
 │       └── components/  Dashboard, TrendsView, MetricFullscreen, Settings, SetupWizard, InfoTip
 ├── docs/
 │   ├── screenshots/    README captures (desktop, tablet, phone)
@@ -84,7 +84,7 @@ Before trusting the poller, confirm the registers decode correctly against your 
 SIGEN_IP=192.168.1.50 npm run probe
 ```
 
-It connects and sweeps a catalogue of candidate registers grouped by category (system and status, power flows, battery and ESS, energy counters), printing the decoded value and unit for each and a dash for any the firmware doesn't answer, so you can see at a glance which signals your unit exposes beyond the four the poller uses. The per-inverter registers (MPPT strings, cell temperatures, model and serial) and the EV charger sit on their own Modbus unit IDs; set `SIGEN_INVERTER_ID` and/or `SIGEN_AC_CHARGER_ID` to add those sweeps:
+It connects and sweeps a catalogue of candidate registers grouped by category (system and status, power flows, battery and ESS, energy counters), printing the decoded value and unit for each and a dash for any the firmware doesn't answer, so you can see at a glance which signals your unit exposes beyond the ones the poller uses. The per-inverter registers (MPPT strings, cell temperatures, model and serial) and the EV charger sit on their own Modbus unit IDs; set `SIGEN_INVERTER_ID` and/or `SIGEN_AC_CHARGER_ID` to add those sweeps:
 
 ```bash
 SIGEN_IP=192.168.1.50 SIGEN_INVERTER_ID=1 npm run probe
