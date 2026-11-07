@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PAGE_REVEAL, isRevealArrival, revealDelaysOf, revealPlanOf } from './pageReveal.js'
+import { PAGE_REVEAL, isRevealArrival, revealDelaysOf } from './pageReveal.js'
 
 describe('page reveal arrivals', () => {
   it('reveals a fresh forward arrival once, inside its window', () => {
@@ -30,20 +30,5 @@ describe('page reveal delays', () => {
 
   it('finishes the whole reveal inside 600 ms', () => {
     expect(PAGE_REVEAL.maxSteps * PAGE_REVEAL.stepMs + PAGE_REVEAL.durationMs).toBeLessThan(600)
-  })
-})
-
-describe('page reveal plans', () => {
-  it('fades a repeat visit briefly from half opacity with no stagger', () => {
-    const repeat = revealPlanOf({ repeat: true })
-    expect(repeat.stepMs).toBe(0)
-    expect(repeat.fromOpacity).toBeGreaterThan(0)
-    expect(repeat.durationMs).toBeLessThan(PAGE_REVEAL.durationMs)
-  })
-
-  it('keeps the full staggered reveal on a first visit', () => {
-    const first = revealPlanOf({ repeat: false })
-    expect(first.stepMs).toBe(PAGE_REVEAL.stepMs)
-    expect(first.fromOpacity).toBe(0)
   })
 })

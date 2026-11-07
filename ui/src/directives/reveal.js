@@ -1,41 +1,32 @@
-import { isRevealArrival, revealDelaysOf, revealPlanOf } from '../lib/pageReveal.js'
-import { latestArrival } from '../router.js'
+import { PAGE_REVEAL, isRevealArrival, revealDelaysOf } from '../lib/pageReveal.js'
+import { latestArrival } from '../lib/revealArrival.js'
 
 export const vReveal = {
-  mounted: (el, { value }) => requestReveal({ el, hold: holdOf(value), keyed: false }),
+  mounted: (el, { value }) => requestReveal({ el, hold: holdOf(value) }),
   updated: (el, { value, oldValue }) => {
-    if (keyOf(value) !== keyOf(oldValue)) requestReveal({ el, hold: holdOf(value), keyed: true })
+    if (keyOf(value) !== keyOf(oldValue)) requestReveal({ el, hold: holdOf(value) })
   }
 }
 
 const pending = []
-const visitedViews = new Set()
 
-const requestReveal = ({ el, hold, keyed }) => {
+const requestReveal = ({ el, hold }) => {
   const arrival = latestArrival()
   if (!isRevealArrival({ arrival, nowMs: performance.now() })) return
-  if (arrival.sameView && !keyed) return
   pending.push({ el, hold })
   if (pending.length === 1) queueMicrotask(flushReveal)
 }
 
 const flushReveal = () => {
-  const arrival = latestArrival()
-  arrival.revealed = true
+  latestArrival().revealed = true
   const targets = pending.splice(0)
-  const plan = revealPlanOf({ repeat: isRepeatVisit(arrival.view) })
+  const plan = PAGE_REVEAL
   if (prefersReducedMotion()) return
   const items = revealItemsOf(targets)
   const delays = revealDelaysOf({ boxes: items.map(boxOf), viewportHeight: window.innerHeight, stepMs: plan.stepMs })
   items.forEach((item, index) => {
     if (delays[index] !== null) slideIn({ el: item, delay: delays[index], plan })
   })
-}
-
-const isRepeatVisit = (view) => {
-  const repeat = visitedViews.has(view)
-  visitedViews.add(view)
-  return repeat
 }
 
 const revealItemsOf = (targets) => {

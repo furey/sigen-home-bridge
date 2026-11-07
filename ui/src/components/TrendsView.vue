@@ -1102,7 +1102,7 @@ watch([() => visible.value.length, windowReady, () => panEnd.value], () => {
 </script>
 
 <template>
-  <section class="trends-section flex flex-col gap-3 rounded-2xl phone-bleed bg-zinc-900 p-4 ring-1 ring-zinc-800 sm:p-5">
+  <section v-reveal class="trends-section flex flex-col gap-3 rounded-2xl phone-bleed bg-zinc-900 p-4 ring-1 ring-zinc-800 sm:p-5">
     <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
       <div
         class="flex w-full gap-0.5 rounded-xl bg-zinc-950/60 p-1 ring-1 ring-zinc-800 sm:w-auto"

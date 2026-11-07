@@ -4,19 +4,9 @@ export const PAGE_REVEAL = {
   maxSteps: 4,
   offsetPx: 6,
   arrivalWindowMs: 1500,
-  easing: 'cubic-bezier(0.2, 0.7, 0.2, 1)'
+  easing: 'cubic-bezier(0.2, 0.7, 0.2, 1)',
+  fromOpacity: 0
 }
-
-export const REPEAT_REVEAL = {
-  durationMs: 160,
-  stepMs: 0,
-  offsetPx: 0,
-  fromOpacity: 0.5
-}
-
-export const revealPlanOf = ({ repeat }) => (repeat
-  ? { ...PAGE_REVEAL, ...REPEAT_REVEAL }
-  : { ...PAGE_REVEAL, fromOpacity: 0 })
 
 export const isRevealArrival = ({ arrival, nowMs, windowMs = PAGE_REVEAL.arrivalWindowMs }) => Boolean(arrival)
   && arrival.fresh

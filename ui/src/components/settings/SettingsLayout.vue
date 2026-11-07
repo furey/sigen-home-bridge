@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, ChevronRight, X } from '@lucide/vue'
+import { beginReveal } from '../../lib/revealArrival.js'
 import { useDashboardView } from '../../composables/useDashboardView.js'
 import { useSettings } from '../../composables/useSettings.js'
 import { useSession } from '../../composables/useSession.js'
@@ -16,6 +17,10 @@ const { unlocked, clearToken, expiredMidEdit } = useSession()
 
 const ready = ref(false)
 const locked = computed(() => data.security.passcodeSet && !unlocked.value)
+
+watch(locked, (isLocked, wasLocked) => {
+  if (wasLocked && !isLocked) beginReveal()
+})
 
 const atMenu = computed(() => route.name === 'settings')
 

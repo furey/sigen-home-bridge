@@ -1,5 +1,6 @@
 import { START_LOCATION, createRouter, createWebHistory } from 'vue-router'
 import { metricBySlug } from './lib/metrics.js'
+import { beginReveal } from './lib/revealArrival.js'
 import { useSettings } from './composables/useSettings.js'
 import { useDashboardView } from './composables/useDashboardView.js'
 import Dashboard from './components/Dashboard.vue'
@@ -72,19 +73,7 @@ router.beforeEach(async (to, from) => {
   return (await useSettings().shouldRunSetup()) ? { name: 'setup' } : true
 })
 
-export const latestArrival = () => arrival
-
-let arrival = null
-
 router.afterEach((to, from, failure) => {
-  arrival = {
-    fresh: !failure,
-    at: performance.now(),
-    revealed: false,
-    sameView: sameViewOf(to, from),
-    view: String(to.name)
-  }
+  if (failure) return
+  beginReveal()
 })
-
-const sameViewOf = (to, from) =>
-  Boolean(from.matched[0]) && from.matched[0].components?.default === to.matched[0]?.components?.default
