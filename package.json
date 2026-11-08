@@ -23,7 +23,8 @@
     "screenshots": "scripts/capture-screenshots.sh",
     "walkthrough": "scripts/capture-walkthrough.sh",
     "og": "scripts/generate-og.sh",
-    "install:all": "npm install && npm --prefix server install && npm --prefix ui install"
+    "install:all": "npm install && npm --prefix server install && npm --prefix ui install",
+    "diagrams": "node scripts/diagrams/build.mjs"
   },
   "volta": {
     "node": "24.15.0"

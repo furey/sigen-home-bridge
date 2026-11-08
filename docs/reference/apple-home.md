@@ -23,16 +23,7 @@ The power unit is configurable in Settings → Apple Home: `kilowatts` (default,
 
 One sharp edge comes free with the temperature trick: `CurrentTemperature` is always Celsius on the wire, and the Home app converts it to the home's display unit. A home set to Fahrenheit will show `4.5` as `40.1°F`, so the number stops matching the kW or watts. There's no per-accessory unit override in HomeKit, so the only fixes are setting the Home app to Celsius or reading the values on the dashboard. The UI and README both flag this.
 
-```mermaid
-graph TD
-  climate["Climate"]
-  climate --> temp["Temperature<br>grouped tile, shows a range<br>e.g. 0.0° to 2.5°"]
-  temp --> solar["Solar Production<br>2.5° = 2.5 kW"]
-  temp --> home["Home Consumption<br>0.4° = 0.4 kW"]
-  temp --> grid["Grid Power<br>0.0° = 0 kW"]
-  temp --> batt["Battery Power<br>2.3° = 2.3 kW charging"]
-  climate --> humid["Humidity<br>31% = battery state of charge"]
-```
+<Diagram name="apple-home" alt="Each power reading on the dashboard appears in the Home app as a temperature sensor, so 2.5 kW of solar shows as 2.5 degrees; battery charge appears as humidity." />
 
 Power gets temperature because it is the only native sensor that carries a sign, so grid export and battery discharge can read negative; humidity and light are positive-only (0 to 100%, and lux ≥ 0). Battery charge is naturally 0 to 100%, so it maps cleanly onto a Humidity sensor, which is why the Battery Percent tile reads as a percentage. HomeKit does define power and energy characteristics (the Eve-style custom ones), but the Apple Home app ignores them; they only surface in third-party apps like Eve. So these mappings are the cost of seeing the numbers in Apple's own app. For a properly labelled view use the web dashboard, and lean on HomeKit for automations (trigger when Solar Production climbs above a threshold) and a quick glance.
 

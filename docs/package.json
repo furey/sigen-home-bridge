@@ -11,12 +11,9 @@
     "test": "node --test test/*.test.mjs"
   },
   "devDependencies": {
-    "mermaid": "^11.16.0",
-    "vitepress": "^1.6.4",
-    "vitepress-plugin-mermaid": "^2.0.17"
+    "vitepress": "^1.6.4"
   },
   "overrides": {
-    "vite": "^6.4.4",
-    "katex": "^0.18.2"
+    "vite": "^6.4.4"
   }
 }

@@ -29,50 +29,10 @@ The technical companion to [`README.md`](../README.md): what the bridge is doing
 
 ## Architecture
 
-```mermaid
-flowchart TB
-  subgraph lan["Home LAN"]
-    gw["Sigenergy gateway<br>Modbus TCP :502"]
-
-    subgraph bridge["sigen-home-bridge container"]
-      poller["Modbus poller<br>schedule-aware loop"]
-      weather["Weather poller<br>Open-Meteo"]
-      state["Shared state<br>+ pub/sub"]
-      hist["History buffer<br>retention window"]
-      hk["HomeKit bridge<br>hap-nodejs"]
-      http["Express server<br>SSE · REST · fulfillment · static UI"]
-      cfg[("settings.json")]
-      histdb[("history.db<br>SQLite · WAL")]
-    end
-
-    home["Apple Home<br>iPhone · iPad · HomePod"]
-    browser["Web dashboard<br>wizard + settings"]
-    apiclient["JSON API client<br>scripts · Home Assistant"]
-  end
-
-  tunnel["Cloudflare Tunnel<br>HTTPS"]
-  google["Google Home"]
-  meteo["Open-Meteo + IP geo"]
-
-  gw -->|"read registers"| poller
-  poller --> state
-  poller --> hist
-  hist -->|"GET /api/history · export"| http
-  hist -->|"write-through insert"| histdb
-  meteo -->|"current temp"| weather
-  weather --> state
-  state --> hk
-  state --> http
-  hk -->|"Bonjour / mDNS"| home
-  http -->|"SSE /events"| browser
-  http -->|"GET /api/snapshot · history"| apiclient
-  browser -->|"PUT /api/settings"| http
-  http --> cfg
-  cfg -->|"live reload"| poller
-  cfg -->|"live reload"| weather
-  google --> tunnel
-  tunnel -->|"POST /fulfillment"| http
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="public/diagrams/architecture-dark.svg">
+  <img src="public/diagrams/architecture-light.svg" alt="The gateway and Open-Meteo feed one sigen-home-bridge container on your home network, which serves Apple Home, the dashboard, and the JSON API locally, and Google Home through a Cloudflare Tunnel." width="680">
+</picture>
 
 A single process holds one persistent Modbus TCP socket to the gateway and polls the plant registers in the [register map](#register-map) on a timer, plus each inverter's block and the Smart Port blocks (battery power is derived from the plant readings). Each cycle writes to a shared in-memory state object and pushes it to its consumers:
 
@@ -90,20 +50,10 @@ The gateway address can also be auto-detected. `POST /api/discover/gateway` (the
 
 If the gateway drops, the poller logs the error, marks the state disconnected, and retries on a fixed delay without ever crashing or zeroing the last known values.
 
-```mermaid
-stateDiagram-v2
-  [*] --> Connecting
-  Connecting --> Reading: socket open
-  Connecting --> Disconnected: connect error
-  Reading --> Waiting: update state · publish · log
-  Reading --> Disconnected: read error
-  Waiting --> Reading: timer fires (schedule interval)
-  Disconnected --> Connecting: after RECONNECT_DELAY_MS
-  note right of Disconnected
-    last known values are kept and served
-    while the state shows offline
-  end note
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="public/diagrams/poller-dark.svg">
+  <img src="public/diagrams/poller-light.svg" alt="The poller connects, then loops between reading the registers and waiting for the poll interval. A read or connect error marks it offline, keeps the last readings on screen, and retries after a delay." width="680">
+</picture>
 
 The weather poller is similarly failure-tolerant: a failed fetch gets one immediate second attempt, and until the first reading lands the poller tries every 30 seconds (the same cadence covers a failed location lookup) before settling into the normal refresh interval, so a flaky API briefly delays the temperature instead of hiding it until the next restart.
 
@@ -111,17 +61,10 @@ The weather poller is similarly failure-tolerant: a failed fetch gets one immedi
 
 Every value in `.env` is a seed for first boot. Once you save in the UI it's written to `/data/settings.json`, which takes precedence (`TZ`, `CLOUDFLARE_TUNNEL_TOKEN`, and `DATA_DIR` are the exceptions; they're read from the environment at process start). Most changes apply immediately: editing the gateway reconnects the Modbus socket, weather reloads its fetch loop, and poll edits take effect on the next cycle. The HomeKit fields and the HTTP server port can't change on a running process, so they're marked "requires restart" and apply on the next start. The Google token is write-only: it's never sent back to the browser (shown as `••••• (stored)`), so leave it blank to keep the current value. The optional Settings passcode is similar: it lands in the `security` section as a salted scrypt hash, the API reports only whether one is set, and once set every settings change must carry a session token from `POST /api/unlock`. Reset returns every setting except history retention to the env seeds, clears the passcode, and re-runs the wizard; stored history and HomeKit pairing are kept.
 
-```mermaid
-flowchart LR
-  def["Built-in defaults"] -->|overridden by| env["Env seed<br>.env"]
-  env -->|overridden by| gui["settings.json<br>saved in the wizard / settings"]
-  gui --> active["Active settings"]
-  active --> q{"is 'now' inside<br>a poll window?"}
-  q -->|yes| w["use that window's interval"]
-  q -->|no| d["use the default interval"]
-  w --> nextpoll["wait, then poll again"]
-  d --> nextpoll
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="public/diagrams/configuration-dark.svg">
+  <img src="public/diagrams/configuration-light.svg" alt="settings.json beats .env, which beats the built-in defaults. A 24-hour bar shows poll windows that override the default interval at set times of day." width="680">
+</picture>
 
 For polling, set a default interval, then add overrides: time windows that poll at their own rate. For example, keep the default at 5 seconds and add an overnight override of 60 seconds from 23:00 to 08:00, so the system isn't hammered while nothing changes. Windows use the container's local time, so set `TZ`.
 
@@ -249,16 +192,10 @@ The power unit is configurable in Settings → Apple Home: `kilowatts` (default,
 
 One sharp edge comes free with the temperature trick: `CurrentTemperature` is always Celsius on the wire, and the Home app converts it to the home's display unit. A home set to Fahrenheit will show `4.5` as `40.1°F`, so the number stops matching the kW or watts. There's no per-accessory unit override in HomeKit, so the only fixes are setting the Home app to Celsius or reading the values on the dashboard. The UI and README both flag this.
 
-```mermaid
-graph TD
-  climate["Climate"]
-  climate --> temp["Temperature<br>grouped tile, shows a range<br>e.g. 0.0° to 2.5°"]
-  temp --> solar["Solar Production<br>2.5° = 2.5 kW"]
-  temp --> home["Home Consumption<br>0.4° = 0.4 kW"]
-  temp --> grid["Grid Power<br>0.0° = 0 kW"]
-  temp --> batt["Battery Power<br>2.3° = 2.3 kW charging"]
-  climate --> humid["Humidity<br>31% = battery state of charge"]
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="public/diagrams/apple-home-dark.svg">
+  <img src="public/diagrams/apple-home-light.svg" alt="Each power reading on the dashboard appears in the Home app as a temperature sensor, so 2.5 kW of solar shows as 2.5 degrees; battery charge appears as humidity." width="680">
+</picture>
 
 Power gets temperature because it is the only native sensor that carries a sign, so grid export and battery discharge can read negative; humidity and light are positive-only (0 to 100%, and lux ≥ 0). Battery charge is naturally 0 to 100%, so it maps cleanly onto a Humidity sensor, which is why the Battery Percent tile reads as a percentage. HomeKit does define power and energy characteristics (the Eve-style custom ones), but the Apple Home app ignores them; they only surface in third-party apps like Eve. So these mappings are the cost of seeing the numbers in Apple's own app. For a properly labelled view use the web dashboard, and lean on HomeKit for automations (trigger when Solar Production climbs above a threshold) and a quick glance.
 
@@ -384,21 +321,10 @@ In the UI the alerts are a collapsible, sortable list (the sort preference rides
 
 Google has deprecated the Actions Console and is steering integrations toward cloud-to-cloud rather than self-hosted fulfillment, and the old `actions-on-google` library is unmaintained. This project therefore implements the SYNC, QUERY, EXECUTE, and DISCONNECT intents as plain Express handlers with no external library. Everything is read-only; EXECUTE is a no-op.
 
-```mermaid
-sequenceDiagram
-  participant G as Google Home
-  participant T as Cloudflare Tunnel
-  participant B as Bridge (Express)
-  G->>T: OAuth /auth then /token
-  T->>B: forward
-  B-->>G: static bearer (stub)
-  G->>T: POST /fulfillment · SYNC
-  T->>B: forward
-  B-->>G: battery + four power devices
-  G->>T: POST /fulfillment · QUERY
-  T->>B: forward
-  B-->>G: current readings from state
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="public/diagrams/google-dark.svg">
+  <img src="public/diagrams/google-light.svg" alt="Google Home reaches the bridge only through the Cloudflare Tunnel: it links the account, asks which devices exist (SYNC), then asks for current values (QUERY)." width="680">
+</picture>
 
 The bridge ships a minimal OAuth for personal use that hands Google a static bearer: the Auth token in Settings → Google Home (seeded from `GOOGLE_AUTH_TOKEN`). `/auth` redirects only to Google's account-linking addresses (`https://oauth-redirect.googleusercontent.com/r/…` and its sandbox twin), with a random one-time code that expires after 10 minutes. `/token` first checks that the client secret, sent in the form body or as HTTP Basic auth, equals the auth token. It then trades a valid code (once) or a refresh token equal to the auth token for the bearer. The Client ID is not checked.
 
@@ -554,17 +480,18 @@ sigen-home-bridge/
 
 Run from the repository root.
 
-| Script                | Action                                                                                           |
-| --------------------- | ------------------------------------------------------------------------------------------------ |
-| `npm run install:all` | Install root, server, and UI dependencies                                                        |
-| `npm run dev`         | Run the bridge and the Vite dev server together                                                  |
-| `npm run build`       | Build the UI into `ui/dist`                                                                      |
-| `npm start`           | Start the bridge (serves the built UI)                                                           |
-| `npm test`            | Run the server, UI, and docs unit tests                                                          |
-| `npm run probe`       | Read the gateway once and print decoded values                                                   |
-| `npm run screenshots` | Recapture the README screenshots (Docker + Playwright)                                           |
-| `npm run walkthrough` | Record and publish the desktop and tablet walkthrough videos (Docker + headless Chrome + ffmpeg) |
-| `npm run og`          | Regenerate the docs social preview card (Docker + Playwright)                                    |
+| Script                | Action                                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------------------ |
+| `npm run install:all` | Install root, server, and UI dependencies                                                              |
+| `npm run dev`         | Run the bridge and the Vite dev server together                                                        |
+| `npm run build`       | Build the UI into `ui/dist`                                                                            |
+| `npm start`           | Start the bridge (serves the built UI)                                                                 |
+| `npm test`            | Run the server, UI, and docs unit tests                                                                |
+| `npm run probe`       | Read the gateway once and print decoded values                                                         |
+| `npm run screenshots` | Recapture the README screenshots (Docker + Playwright)                                                 |
+| `npm run diagrams`    | Regenerate the light and dark SVG diagrams in `docs/public/diagrams` from `scripts/diagrams/build.mjs` |
+| `npm run walkthrough` | Record and publish the desktop and tablet walkthrough videos (Docker + headless Chrome + ffmpeg)       |
+| `npm run og`          | Regenerate the docs social preview card (Docker + Playwright)                                          |
 
 ## Releasing the image
 

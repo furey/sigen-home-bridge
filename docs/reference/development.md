@@ -65,17 +65,18 @@ sigen-home-bridge/
 
 Run from the repository root.
 
-| Script                | Action                                                                                           |
-| --------------------- | ------------------------------------------------------------------------------------------------ |
-| `npm run install:all` | Install root, server, and UI dependencies                                                        |
-| `npm run dev`         | Run the bridge and the Vite dev server together                                                  |
-| `npm run build`       | Build the UI into `ui/dist`                                                                      |
-| `npm start`           | Start the bridge (serves the built UI)                                                           |
-| `npm test`            | Run the server, UI, and docs unit tests                                                          |
-| `npm run probe`       | Read the gateway once and print decoded values                                                   |
-| `npm run screenshots` | Recapture the README screenshots (Docker + Playwright)                                           |
-| `npm run walkthrough` | Record and publish the desktop and tablet walkthrough videos (Docker + headless Chrome + ffmpeg) |
-| `npm run og`          | Regenerate the docs social preview card (Docker + Playwright)                                    |
+| Script                | Action                                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------------------ |
+| `npm run install:all` | Install root, server, and UI dependencies                                                              |
+| `npm run dev`         | Run the bridge and the Vite dev server together                                                        |
+| `npm run build`       | Build the UI into `ui/dist`                                                                            |
+| `npm start`           | Start the bridge (serves the built UI)                                                                 |
+| `npm test`            | Run the server, UI, and docs unit tests                                                                |
+| `npm run probe`       | Read the gateway once and print decoded values                                                         |
+| `npm run screenshots` | Recapture the README screenshots (Docker + Playwright)                                                 |
+| `npm run diagrams`    | Regenerate the light and dark SVG diagrams in `docs/public/diagrams` from `scripts/diagrams/build.mjs` |
+| `npm run walkthrough` | Record and publish the desktop and tablet walkthrough videos (Docker + headless Chrome + ffmpeg)       |
+| `npm run og`          | Regenerate the docs social preview card (Docker + Playwright)                                          |
 
 ## Releasing the image
 

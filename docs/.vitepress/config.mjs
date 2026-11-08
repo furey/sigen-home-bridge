@@ -1,5 +1,4 @@
 import { defineConfig } from 'vitepress'
-import { withMermaid } from 'vitepress-plugin-mermaid'
 import { headingIcon } from './headingIcon.mjs'
 
 const repo = 'https://github.com/furey/sigen-home-bridge'
@@ -18,7 +17,7 @@ const pageTitle = (pageData) =>
     ? 'sigen-home-bridge'
     : `${pageData.title} · sigen-home-bridge`
 
-export default withMermaid(defineConfig({
+export default defineConfig({
   base: '/sigen-home-bridge/',
   lang: 'en-AU',
   title: 'sigen-home-bridge',
@@ -29,7 +28,6 @@ export default withMermaid(defineConfig({
   metaChunk: true,
   srcExclude: ['DEEP_DIVE.md', 'README.md', '**/node_modules/**'],
   sitemap: { hostname: site },
-  vite: { optimizeDeps: { include: ['mermaid > fastdom', 'mermaid > fastdom/extensions/fastdom-promised.js'] } },
   markdown: { config: headingIcon },
 
   head: [
@@ -204,11 +202,5 @@ export default withMermaid(defineConfig({
         'MIT licensed. Not affiliated with or endorsed by Sigenergy, Apple, Google, or Cloudflare.',
       copyright: `<a href="${repo}">Source on GitHub</a>`
     }
-  },
-
-  mermaid: {
-    securityLevel: 'strict',
-    flowchart: { useMaxWidth: true },
-    themeVariables: { fontFamily: 'inherit' }
   }
-}))
+})

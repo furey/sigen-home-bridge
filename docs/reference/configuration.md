@@ -9,17 +9,7 @@ description: Settings precedence, the full .env reference, and the poll schedule
 
 Every value in `.env` is a seed for first boot. Once you save in the UI it's written to `/data/settings.json`, which takes precedence (`TZ`, `CLOUDFLARE_TUNNEL_TOKEN`, and `DATA_DIR` are the exceptions; they're read from the environment at process start). Most changes apply immediately: editing the gateway reconnects the Modbus socket, weather reloads its fetch loop, and poll edits take effect on the next cycle. The HomeKit fields and the HTTP server port can't change on a running process, so they're marked "requires restart" and apply on the next start. The Google token is write-only: it's never sent back to the browser (shown as `••••• (stored)`), so leave it blank to keep the current value. The optional Settings passcode is similar: it lands in the `security` section as a salted scrypt hash, the API reports only whether one is set, and once set every settings change must carry a session token from `POST /api/unlock`. Reset returns every setting except history retention to the env seeds, clears the passcode, and re-runs the wizard; stored history and HomeKit pairing are kept.
 
-```mermaid
-flowchart LR
-  def["Built-in defaults"] -->|overridden by| env["Env seed<br>.env"]
-  env -->|overridden by| gui["settings.json<br>saved in the wizard / settings"]
-  gui --> active["Active settings"]
-  active --> q{"is 'now' inside<br>a poll window?"}
-  q -->|yes| w["use that window's interval"]
-  q -->|no| d["use the default interval"]
-  w --> nextpoll["wait, then poll again"]
-  d --> nextpoll
-```
+<Diagram name="configuration" alt="settings.json beats .env, which beats the built-in defaults. A 24-hour bar shows poll windows that override the default interval at set times of day." />
 
 For polling, set a default interval, then add overrides: time windows that poll at their own rate. For example, keep the default at 5 seconds and add an overnight override of 60 seconds from 23:00 to 08:00, so the system isn't hammered while nothing changes. Windows use the container's local time, so set `TZ`.
 

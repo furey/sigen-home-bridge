@@ -7,21 +7,7 @@ description: The SYNC/QUERY/EXECUTE/DISCONNECT intents as plain Express handlers
 
 Google has deprecated the Actions Console and is steering integrations toward cloud-to-cloud rather than self-hosted fulfillment, and the old `actions-on-google` library is unmaintained. This project therefore implements the SYNC, QUERY, EXECUTE, and DISCONNECT intents as plain Express handlers with no external library. Everything is read-only; EXECUTE is a no-op.
 
-```mermaid
-sequenceDiagram
-  participant G as Google Home
-  participant T as Cloudflare Tunnel
-  participant B as Bridge (Express)
-  G->>T: OAuth /auth then /token
-  T->>B: forward
-  B-->>G: static bearer (client secret checked)
-  G->>T: POST /fulfillment · SYNC
-  T->>B: forward
-  B-->>G: battery + four power devices
-  G->>T: POST /fulfillment · QUERY
-  T->>B: forward
-  B-->>G: current readings from state
-```
+<Diagram name="google" alt="Google Home reaches the bridge only through the Cloudflare Tunnel: it links the account, asks which devices exist (SYNC), then asks for current values (QUERY)." />
 
 The bridge ships a minimal OAuth for personal use that hands Google a static bearer: the Auth token in Settings → Google Home (seeded from `GOOGLE_AUTH_TOKEN`). `/auth` redirects only to Google's account-linking addresses (`https://oauth-redirect.googleusercontent.com/r/…` and its sandbox twin), with a random one-time code that expires after 10 minutes. `/token` first checks that the client secret, sent in the form body or as HTTP Basic auth, equals the auth token. It then trades a valid code (once) or a refresh token equal to the auth token for the bearer. The Client ID is not checked.
 

@@ -5,50 +5,7 @@ description: One process, one persistent Modbus socket, a timed register poll, p
 
 # Architecture
 
-```mermaid
-flowchart TB
-  subgraph lan["Home LAN"]
-    gw["Sigenergy gateway<br>Modbus TCP :502"]
-
-    subgraph bridge["sigen-home-bridge container"]
-      poller["Modbus poller<br>schedule-aware loop"]
-      weather["Weather poller<br>Open-Meteo"]
-      state["Shared state<br>+ pub/sub"]
-      hist["History buffer<br>retention window"]
-      hk["HomeKit bridge<br>hap-nodejs"]
-      http["Express server<br>SSE · REST · fulfillment · static UI"]
-      cfg[("settings.json")]
-      histdb[("history.db<br>SQLite · WAL")]
-    end
-
-    home["Apple Home<br>iPhone · iPad · HomePod"]
-    browser["Web dashboard<br>wizard + settings"]
-    apiclient["JSON API client<br>scripts · Home Assistant"]
-  end
-
-  tunnel["Cloudflare Tunnel<br>HTTPS"]
-  google["Google Home"]
-  meteo["Open-Meteo + IP geo"]
-
-  gw -->|"read registers"| poller
-  poller --> state
-  poller --> hist
-  hist -->|"GET /api/history · export"| http
-  hist -->|"write-through insert"| histdb
-  meteo -->|"current temp"| weather
-  weather --> state
-  state --> hk
-  state --> http
-  hk -->|"Bonjour / mDNS"| home
-  http -->|"SSE /events"| browser
-  http -->|"GET /api/snapshot · history"| apiclient
-  browser -->|"PUT /api/settings"| http
-  http --> cfg
-  cfg -->|"live reload"| poller
-  cfg -->|"live reload"| weather
-  google --> tunnel
-  tunnel -->|"POST /fulfillment"| http
-```
+<Diagram name="architecture" alt="The gateway and Open-Meteo feed one sigen-home-bridge container on your home network, which serves Apple Home, the dashboard, and the JSON API locally, and Google Home through a Cloudflare Tunnel." />
 
 A single process holds one persistent Modbus TCP socket to the gateway and polls the plant registers in the [register map](/reference/register-map) on a timer, plus each inverter's block and the Smart Port blocks (battery power is derived from the plant readings). Each cycle writes to a shared in-memory state object and pushes it to its consumers:
 
@@ -66,19 +23,6 @@ The gateway address can also be auto-detected. `POST /api/discover/gateway` (the
 
 If the gateway drops, the poller logs the error, marks the state disconnected, and retries on a fixed delay without ever crashing or zeroing the last known values.
 
-```mermaid
-stateDiagram-v2
-  [*] --> Connecting
-  Connecting --> Reading: socket open
-  Connecting --> Disconnected: connect error
-  Reading --> Waiting: update state · publish · log
-  Reading --> Disconnected: read error
-  Waiting --> Reading: timer fires (schedule interval)
-  Disconnected --> Connecting: after RECONNECT_DELAY_MS
-  note right of Disconnected
-    last known values are kept and served
-    while the state shows offline
-  end note
-```
+<Diagram name="poller" alt="The poller connects, then loops between reading the registers and waiting for the poll interval. A read or connect error marks it offline, keeps the last readings on screen, and retries after a delay." />
 
 The weather poller is similarly failure-tolerant: a failed fetch gets one immediate second attempt, and until the first reading lands the poller tries every 30 seconds (the same cadence covers a failed location lookup) before settling into the normal refresh interval, so a flaky API briefly delays the temperature instead of hiding it until the next restart.
