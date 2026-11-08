@@ -16,7 +16,7 @@ hero:
       text: Get started
       link: /guide/getting-started
     - theme: alt
-      text: What it is
+      text: Introduction
       link: /guide/
     - theme: alt
       text: Technical deep dive
