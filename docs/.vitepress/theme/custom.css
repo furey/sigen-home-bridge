@@ -178,7 +178,7 @@ h1.title,
   vertical-align: -0.1em;
 }
 
-/* App screenshots sit in a dark tablet bezel, matching the tablet on the home page. */
+/* Full-screen app screenshots sit in a dark tablet bezel, matching the tablet on the home page. */
 .vp-doc .device-frame {
   --bezel: clamp(9px, 2.4%, 16px);
   position: relative;
