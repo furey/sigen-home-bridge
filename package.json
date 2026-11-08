@@ -19,7 +19,7 @@
     "build": "npm --prefix ui run build",
     "start": "npm --prefix server start",
     "probe": "npm --prefix server run probe",
-    "test": "npm --prefix server test && npm --prefix ui test",
+    "test": "npm --prefix server test && npm --prefix ui test && npm --prefix docs test",
     "screenshots": "scripts/capture-screenshots.sh",
     "walkthrough": "scripts/capture-walkthrough.sh",
     "og": "scripts/generate-og.sh",

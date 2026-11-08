@@ -169,6 +169,15 @@ h1.title,
   text-wrap: pretty;
 }
 
+/* Area icon before a guide page title, set by the page's `icon` frontmatter. */
+.vp-doc h1 .heading-icon {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  margin-right: 0.4em;
+  vertical-align: -0.1em;
+}
+
 /* Keyboard hints (used on the trends and passcode pages). */
 kbd {
   display: inline-block;

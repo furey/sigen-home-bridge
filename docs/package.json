@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "bash ../scripts/fetch-docs-media.sh && vitepress dev",
     "build": "bash ../scripts/fetch-docs-media.sh && vitepress build",
-    "preview": "vitepress preview"
+    "preview": "vitepress preview",
+    "test": "node --test test/*.test.mjs"
   },
   "devDependencies": {
     "mermaid": "^11.16.0",

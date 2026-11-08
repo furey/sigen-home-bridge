@@ -1,5 +1,6 @@
 ---
 title: Security model
+icon: shield-check
 description: Exactly what's open, what the optional passcode locks, how it's stored, the recovery path, and the one endpoint that stays public for Google.
 ---
 

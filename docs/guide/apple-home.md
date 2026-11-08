@@ -1,5 +1,6 @@
 ---
 title: Apple Home
+icon: house
 description: Pair the bridge with a QR code and read your power and battery in the Home app. Why the numbers show as degrees, and how to rename everything.
 ---
 

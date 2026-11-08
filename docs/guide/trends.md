@@ -1,5 +1,6 @@
 ---
 title: Trends
+icon: chart-spline
 description: The trends chart, its periods and lanes, and how far back your history reaches.
 ---
 

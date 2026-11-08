@@ -1,5 +1,6 @@
 ---
 title: The dashboard
+icon: layout-dashboard
 description: The live panels, the fullscreen readouts, and how to theme it all.
 ---
 

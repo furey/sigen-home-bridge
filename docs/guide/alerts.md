@@ -1,5 +1,6 @@
 ---
 title: Alerts
+icon: bell-ring
 description: Watch any reading and get pinged, through Apple Home, a webhook, or both, when it needs attention.
 ---
 

@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitepress'
 import { withMermaid } from 'vitepress-plugin-mermaid'
+import { headingIcon } from './headingIcon.mjs'
 
 const repo = 'https://github.com/furey/sigen-home-bridge'
 const site = 'https://furey.github.io/sigen-home-bridge/'
@@ -28,6 +29,7 @@ export default withMermaid(defineConfig({
   metaChunk: true,
   srcExclude: ['DEEP_DIVE.md', 'README.md', '**/node_modules/**'],
   sitemap: { hostname: site },
+  markdown: { config: headingIcon },
 
   head: [
     ['link', { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/sigen-home-bridge/favicon-32.png' }],

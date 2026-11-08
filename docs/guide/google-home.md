@@ -1,5 +1,6 @@
 ---
 title: Google Home
+icon: cloud
 description: Battery and power in the Google Home app, reached through a free Cloudflare Tunnel. More setup than Apple Home, and rougher edges.
 ---
 
