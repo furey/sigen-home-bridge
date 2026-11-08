@@ -1,5 +1,6 @@
 ---
 title: What it is
+icon: sigen
 description: sigen-home-bridge reads your Sigenergy solar and battery over your home network and shows the numbers on a dashboard, in Apple Home, and in Google Home.
 ---
 

@@ -1,5 +1,6 @@
 ---
 title: The JSON API
+icon: braces
 description: Everything the dashboard shows is one plain web request away. Poll it into a script, a spreadsheet, Home Assistant, or Node-RED.
 ---
 

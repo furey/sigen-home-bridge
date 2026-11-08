@@ -1,5 +1,6 @@
 ---
 title: Devices
+icon: cpu
 description: The Device Breakdown page opens up each inverter, each solar string, and each Smart Port load behind the dashboard's plant totals.
 ---
 

@@ -1,5 +1,6 @@
 ---
 title: Getting started
+icon: rocket
 description: Switch on the local data feed, run one Docker command, open the dashboard, and point the bridge at your gateway.
 ---
 

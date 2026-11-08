@@ -1,5 +1,6 @@
 ---
 title: Reaching it from away
+icon: globe
 description: The bridge has no login of its own. Here's how to keep it safe on your network, and how to reach it from outside the house without exposing it.
 ---
 

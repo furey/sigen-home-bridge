@@ -1,5 +1,6 @@
 ---
 title: Tariffs & cost
+icon: badge-dollar-sign
 description: Enter your electricity rates and the bridge turns live grid flow into a running cost or credit on the Home tile.
 ---
 

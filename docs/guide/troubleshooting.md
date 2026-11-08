@@ -1,5 +1,6 @@
 ---
 title: Troubleshooting
+icon: life-buoy
 description: "The common snags, and the fix for each: gateway connection, Apple Home discovery, the degrees display, frozen tiles, weather, cost figures, and settings that won't apply."
 ---
 
