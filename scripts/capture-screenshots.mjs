@@ -24,12 +24,14 @@ const STRING_NAMES = { 1: 'North array', 2: 'East array', 3: 'Carport' }
 const run = async () => {
   const group = process.argv[2] || 'all'
   const wants = (name) => group === 'all' || group === name
+  const onlyFiles = process.env.SHOT_FILES?.split(',').filter(Boolean) ?? []
+  const picked = (shot) => !onlyFiles.length || onlyFiles.includes(shot.file)
   const browser = await chromium.launch({ args: ['--font-render-hinting=none'] })
 
   if (wants('data')) {
     const live = await daytimeState()
     const settings = await stagedSettings()
-    for (const shot of dataShots) {
+    for (const shot of dataShots.filter(picked)) {
       const state = shot.inject ? live : null
       await capture(() => shotViewport(browser, { ...shot, state, settings }), shot.file)
     }
@@ -66,6 +68,7 @@ const dataShots = [
   { profile: 'phonePortrait', path: '/metric/solar', file: 'fullscreen-solar-phone-portrait.png', view: DASHBOARD_VIEW, inject: true },
   { profile: 'phoneLandscape', path: '/metric/solar', file: 'fullscreen-solar-phone-landscape.png', view: DASHBOARD_VIEW, inject: true },
   { profile: 'desktop', path: '/cost', file: 'fullscreen-cost-desktop.png', view: DASHBOARD_VIEW, inject: true },
+  { profile: 'tablet', path: '/cost', file: 'fullscreen-cost-tablet.png', view: DASHBOARD_VIEW, inject: true },
   { profile: 'desktop', path: '/devices', file: 'devices-desktop.png', view: DASHBOARD_VIEW, inject: true, clip: clipToArticle }
 ]
 

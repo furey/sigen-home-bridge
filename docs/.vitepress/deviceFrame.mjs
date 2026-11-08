@@ -1,8 +1,8 @@
 const fullScreens = new Set([
-  'dashboard-desktop.png',
-  'fullscreen-solar-desktop.png',
-  'fullscreen-cost-desktop.png',
-  'trends-desktop.png'
+  'dashboard-tablet.png',
+  'fullscreen-solar-tablet.png',
+  'fullscreen-cost-tablet.png',
+  'trends-tablet.png'
 ])
 
 export const deviceFrame = (md) => {

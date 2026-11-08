@@ -8,7 +8,7 @@ description: The trends chart, its periods and lanes, and how far back your hist
 
 The **Trends** switch in the lower left swaps the panels for a chart of every reading on one time axis, at its own `/trends` address. You get the power flows as lines, battery charge as a green area behind them, and a legend that totals each reading across the window you're looking at.
 
-![The trends chart](../screenshots/trends-desktop.png)
+![The trends chart](../screenshots/trends-tablet.png)
 
 - **Scrub back in time.** Hover with a mouse, or press and drag on a touch screen. A cursor line snaps to the nearest reading and the legend, the clock, and the header temperature switch to that moment.
 - **Read the sky.** The chart tints itself by the sun's height across the window, using your weather location, with sunrise and sunset marked on the axis. No internet calls; it's all worked out on the spot.

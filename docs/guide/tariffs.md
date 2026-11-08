@@ -10,7 +10,7 @@ Enter your electricity rates in **Settings → Tariff** and the bridge turns you
 
 Set a fallback import rate and a feed-in (export) rate, then add time-of-use windows to override them: a peak window, an off-peak window, a free period (just a window at rate 0). Windows can wrap past midnight and are read in your system's local time. One switch turns the figures on.
 
-![The cost fullscreen view](../screenshots/fullscreen-cost-desktop.png)
+![The cost fullscreen view](../screenshots/fullscreen-cost-tablet.png)
 
 ## What you see
 

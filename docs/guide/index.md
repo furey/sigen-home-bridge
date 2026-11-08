@@ -18,7 +18,7 @@ It only ever *reads*. It never sends a command back to your system, so it can't 
 - **Alerts.** Get pinged when the battery runs low, the gateway drops off, or you start importing from the grid. Sent to Apple Home, a web address you nominate (ntfy, Pushover, Home Assistant, Discord), or both.
 - **A plain data feed.** Every reading on one web address you can poll into your own scripts, a spreadsheet, or Node-RED.
 
-![The dashboard](../screenshots/dashboard-desktop.png)
+![The dashboard](../screenshots/dashboard-tablet.png)
 
 ## What it isn't
 

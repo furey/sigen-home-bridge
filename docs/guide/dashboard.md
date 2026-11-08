@@ -8,7 +8,7 @@ description: The live panels, the fullscreen readouts, and how to theme it all.
 
 The dashboard is the main screen: solar, battery, grid, and home usage, each in its own panel, all updating as the bridge reads your system. The title sits top centre, the outdoor temperature top left, and the gear (settings) top right. Along the bottom you get the connection state, the last-updated time, and a link to the source on GitHub.
 
-![The dashboard](../screenshots/dashboard-desktop.png)
+![The dashboard](../screenshots/dashboard-tablet.png)
 
 Battery and grid power show a small arrow next to the number, in a darker shade of the panel's colour, so direction reads separately from the value: up for discharging or exporting, down for charging or importing, nothing when it's idle.
 
@@ -28,7 +28,7 @@ Tap any panel for a fullscreen readout, good for a wall display or an iPad. Tap 
 
 On the battery panel the left half opens the charge reading and the right half opens the power flow. The charge reads as a percentage by default; **Settings → Battery** can switch it to stored energy in kWh instead.
 
-![A fullscreen metric readout](../screenshots/fullscreen-solar-desktop.png)
+![A fullscreen metric readout](../screenshots/fullscreen-solar-tablet.png)
 
 Every view has its own web address (`/trends`, `/metric/solar`, `/metric/battery-percent`, `/settings`, and so on), so you can bookmark a single metric or point a wall display straight at it.
 

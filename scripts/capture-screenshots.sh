@@ -30,6 +30,7 @@ docker run --rm --network host \
   -w /tmp \
   -e SIGEN_URL="$SIGEN_URL" \
   -e SCREENSHOT_OUT="/work/${OUT_DIR}" \
+  -e SHOT_FILES \
   "$PLAYWRIGHT_IMAGE" \
   bash -c "npm init -y >/dev/null && \
     npm install --silent --no-save --no-audit --no-fund playwright@${PLAYWRIGHT_VERSION} 2>&1 | tail -1 && \
