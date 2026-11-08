@@ -21,6 +21,7 @@ The technical companion to [`README.md`](../README.md): what the bridge is doing
 - [Local development](#local-development)
 - [Regenerating the README screenshots](#regenerating-the-readme-screenshots)
 - [Recording the walkthrough video](#recording-the-walkthrough-video)
+- [Recording the install demo](#recording-the-install-demo)
 - [Project layout](#project-layout)
 - [Scripts](#scripts)
 - [Releasing the image](#releasing-the-image)
@@ -394,7 +395,7 @@ Chromium launches with `--font-render-hinting=none`. Headless Linux Chromium oth
 
 ## Recording the walkthrough video
 
-`scripts/capture-walkthrough.sh` (`npm run walkthrough`) records two screen tours: a desktop tour for the README and a tablet tour for the documentation home page, where it plays inside the tablet frame. It runs `chrome-headless-shell` from the Playwright Docker image and drives it over the Chrome DevTools Protocol, frame by frame: the page runs on virtual time, and each frame advances the clock by 1/60 s and then renders with `HeadlessExperimental.beginFrame`. Every frame is rendered on schedule, so the video plays at a steady 60 fps however slow the machine is. Real-time recorders only keep the frames Chrome manages to paint, which gives a choppy result. Network requests complete in real time while virtual time advances, so a slow reply delays a chart by a frame or two rather than stalling the run. A DevTools command that gets no reply within 30 seconds fails the run with the command's name, and each tour's container stops after 15 minutes. Each tour's frames land in `tmp/walkthrough-frames/<device>/`, and ffmpeg on the host encodes them (H.264 high profile, `crf 22`, `preset slow`, `yuv420p`, keyframes every 2 s, faststart, no audio). The desktop tour becomes `walkthrough.mp4` (2560×1600), `walkthrough-1x.mp4` (1280×800), and a `walkthrough.jpg` poster. The tablet tour becomes `walkthrough-tablet.mp4` (1194×834) and `walkthrough-tablet.jpg`, which the shell also copies to `docs/public/demo.mp4` and `docs/public/demo-poster.jpg`. All of these are gitignored. `WALKTHROUGH_DEVICE=desktop` or `WALKTHROUGH_DEVICE=tablet` records one tour only. ffmpeg, `gh`, and `jq` have to be on the host alongside Docker.
+`scripts/capture-walkthrough.sh` (`npm run walkthrough`) records two screen tours: a desktop tour for the README and a tablet tour for the documentation home page, where it plays inside the tablet frame. It runs `chrome-headless-shell` from the Playwright Docker image and drives it over the Chrome DevTools Protocol, frame by frame: the page runs on virtual time, and each frame advances the clock by 1/60 s and then renders with `HeadlessExperimental.beginFrame`. Every frame is rendered on schedule, so the video plays at a steady 60 fps however slow the machine is. Real-time recorders only keep the frames Chrome manages to paint, which gives a choppy result. Network requests complete in real time while virtual time advances, so a slow reply delays a chart by a frame or two rather than stalling the run. A DevTools command that gets no reply within 30 seconds fails the run with the command's name, and each tour's container stops after 15 minutes. Each tour's frames land in `tmp/walkthrough-frames/<device>/`, and ffmpeg on the host encodes them (H.264 high profile, `crf 22`, `preset slow`, `yuv420p`, keyframes every 2 s, faststart, no audio). The desktop tour becomes `walkthrough-demo.mp4` (2560×1600), `walkthrough-demo-1x.mp4` (1280×800), and a `walkthrough-demo.jpg` poster. The tablet tour becomes `walkthrough-demo-tablet.mp4` (1194×834) and `walkthrough-demo-tablet.jpg`, which the shell also copies to `docs/public/demo.mp4` and `docs/public/demo-poster.jpg`. All of these are gitignored. `WALKTHROUGH_DEVICE=desktop` or `WALKTHROUGH_DEVICE=tablet` records one tour only. ffmpeg, `gh`, and `jq` have to be on the host alongside Docker.
 
 Point it at an instance carrying live history, the same as the screenshots:
 
@@ -406,9 +407,15 @@ Both tours open on the dashboard, open the fullscreen solar metric, then work th
 
 The readings move on camera. `capture-walkthrough.mjs` precomputes a run of energy-balanced samples (solar ramping up, the battery charging, SoC climbing, grid export growing, home load wobbling, a Smart Port hot water draw holding near 3.6 kW), and a stubbed `EventSource` emits one every 1.4 seconds of virtual time. A read-only server inside the container sits between Chrome and `SIGEN_URL`: it serves the stubbed state, a stubbed unlocked session, the redacted settings, and an empty HomeKit pairing, forwards every other `GET` (the app, the history behind the trends chart), and refuses anything that writes. The settings stub also stages **Show Smart Port on the dashboard**, so the Home tile carries the combined draw and the device breakdown shows the load's card whether or not the target instance has the switch on. The gateway host, HomeKit PIN, advertise address, inverter serial, string names, and outdoor location are swapped for placeholders before they reach the recording, the same redactions the screenshots make.
 
-After encoding, the shell publishes each tour. `scripts/upload-walkthrough.sh` uploads the desktop 2x master to GitHub's user-attachments store and rewrites the README's Demo line to the new URL; GitHub plays a bare user-attachments URL on its own line as an inline video. It uses the same unofficial endpoint as drag-and-drop in the web UI, authenticated with `gh auth token`; if GitHub retires it, drag the mp4 into an issue or PR comment and paste the URL it gives into the README. Each upload gets a new URL, and old uploads can't be listed or deleted. `scripts/upload-docs-media.sh` uploads the tablet video and poster to the `media` GitHub release and starts a docs deploy. Commit README.md afterwards to publish the new Demo URL. `WALKTHROUGH_UPLOAD=0` skips both uploads, and `DOCS_MEDIA_DEPLOY=0` uploads the docs media without a deploy. `WALKTHROUGH_FRAMES` and `WALKTHROUGH_FRAME_MS` retune the data sequence, `WALKTHROUGH_TZ` overrides the timezone, `WALKTHROUGH_CRF` overrides the encode quality, and `WALKTHROUGH_DEBUG=1` logs every request the capture's proxy forwards.
+After encoding, the shell publishes each tour. `scripts/upload-readme-video.sh` uploads the desktop 2x master to GitHub's user-attachments store and points the README's first Demo video at the new URL; GitHub plays a bare user-attachments URL on its own line as an inline video. It uses the same unofficial endpoint as drag-and-drop in the web UI, authenticated with `gh auth token`; if GitHub retires it, drag the mp4 into an issue or PR comment and paste the URL it gives into the README. Each upload gets a new URL, and old uploads can't be listed or deleted. `scripts/upload-docs-media.sh` uploads the tablet video and poster to the `media` GitHub release and starts a docs deploy. Commit README.md afterwards to publish the new Demo URL. `WALKTHROUGH_UPLOAD=0` skips both uploads, and `DOCS_MEDIA_DEPLOY=0` uploads the docs media without a deploy. `WALKTHROUGH_FRAMES` and `WALKTHROUGH_FRAME_MS` retune the data sequence, `WALKTHROUGH_TZ` overrides the timezone, `WALKTHROUGH_CRF` overrides the encode quality, and `WALKTHROUGH_DEBUG=1` logs every request the capture's proxy forwards.
 
-The documentation site's demo video and poster are not in git. They are assets of the `media` GitHub release, listed in `scripts/docs-media.txt`, and `scripts/fetch-docs-media.sh` downloads them into `docs/public/` before every docs build (`npm run dev` and `npm run build` in `docs/` run it first). The repository has immutable releases switched on, and an immutable release refuses new assets, so `media` was created while the setting was off and stays mutable. Never delete and recreate it with the setting on.
+The documentation site's demo videos and posters are not in git. They are assets of the `media` GitHub release, listed in `scripts/docs-media.txt`, and `scripts/fetch-docs-media.sh` downloads them into `docs/public/` before every docs build (`npm run dev` and `npm run build` in `docs/` run it first). The repository has immutable releases switched on, and an immutable release refuses new assets, so `media` was created while the setting was off and stays mutable. Never delete and recreate it with the setting on.
+
+## Recording the install demo
+
+`scripts/capture-install.sh` (`npm run install-demo`) records the one-line install in a terminal. It runs [VHS](https://github.com/charmbracelet/vhs) (`ghcr.io/charmbracelet/vhs`) in Docker to play `scripts/demo/install.tape`. The tape types the real `curl … | sh` command, but a hidden first line turns `curl` and `sh` into shell functions, so nothing downloads and `install.sh` never runs. `scripts/demo/install-sim.sh` prints what a fresh install prints (the banner, the `.env` values, the prompt, the image pull, and the dashboard address), with the pull sped up and a generic address and folder. Nothing touches Docker on the host.
+
+ffmpeg on the host encodes `install-demo.mp4` (1280×800, 25 fps) and an `install-demo-poster.jpg` from its first frame, and copies both into `docs/public/` for the Getting started page. `scripts/upload-readme-video.sh` then uploads the mp4 as the README's second Demo video, and `scripts/upload-docs-media.sh` uploads the docs copies to the `media` release. Commit README.md afterwards. `INSTALL_DEMO_UPLOAD=0` skips both uploads.
 
 ## Generating the social card
 
@@ -480,18 +487,19 @@ sigen-home-bridge/
 
 Run from the repository root.
 
-| Script                | Action                                                                                                 |
-| --------------------- | ------------------------------------------------------------------------------------------------------ |
-| `npm run install:all` | Install root, server, and UI dependencies                                                              |
-| `npm run dev`         | Run the bridge and the Vite dev server together                                                        |
-| `npm run build`       | Build the UI into `ui/dist`                                                                            |
-| `npm start`           | Start the bridge (serves the built UI)                                                                 |
-| `npm test`            | Run the server, UI, and docs unit tests                                                                |
-| `npm run probe`       | Read the gateway once and print decoded values                                                         |
-| `npm run screenshots` | Recapture the README screenshots (Docker + Playwright)                                                 |
-| `npm run diagrams`    | Regenerate the light and dark SVG diagrams in `docs/public/diagrams` from `scripts/diagrams/build.mjs` |
-| `npm run walkthrough` | Record and publish the desktop and tablet walkthrough videos (Docker + headless Chrome + ffmpeg)       |
-| `npm run og`          | Regenerate the docs social preview card (Docker + Playwright)                                          |
+| Script                 | Action                                                                                                 |
+| ---------------------- | ------------------------------------------------------------------------------------------------------ |
+| `npm run install:all`  | Install root, server, and UI dependencies                                                              |
+| `npm run dev`          | Run the bridge and the Vite dev server together                                                        |
+| `npm run build`        | Build the UI into `ui/dist`                                                                            |
+| `npm start`            | Start the bridge (serves the built UI)                                                                 |
+| `npm test`             | Run the server, UI, and docs unit tests                                                                |
+| `npm run probe`        | Read the gateway once and print decoded values                                                         |
+| `npm run screenshots`  | Recapture the README screenshots (Docker + Playwright)                                                 |
+| `npm run diagrams`     | Regenerate the light and dark SVG diagrams in `docs/public/diagrams` from `scripts/diagrams/build.mjs` |
+| `npm run walkthrough`  | Record and publish the desktop and tablet walkthrough videos (Docker + headless Chrome + ffmpeg)       |
+| `npm run install-demo` | Record and publish the install demo video (Docker + VHS + ffmpeg)                                      |
+| `npm run og`           | Regenerate the docs social preview card (Docker + Playwright)                                          |
 
 ## Releasing the image
 

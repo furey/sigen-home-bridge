@@ -1,2 +1,4 @@
 public demo.mp4
 public demo-poster.jpg
+public install-demo.mp4
+public install-demo-poster.jpg

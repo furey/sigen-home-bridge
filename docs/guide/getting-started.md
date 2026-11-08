@@ -26,6 +26,8 @@ On a machine on the same network as your gateway, with [Docker](https://docs.doc
 curl -fsSL https://raw.githubusercontent.com/furey/sigen-home-bridge/main/install.sh | sh
 ```
 
+<InstallVideo />
+
 The script creates the `sigen-home-bridge` folder, downloads its `compose.yaml`, and writes a `.env` (the settings file Docker Compose reads) with your time zone filled in. On Linux it also sets `HOMEKIT_BIND` to your network interface, so Apple Home advertises only on your home network. It shows those values and asks before it starts; press `Enter` to accept them. The bridge then downloads and starts, and the script prints the dashboard address.
 
 ::: details Install script options

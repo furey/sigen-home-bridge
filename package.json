@@ -22,6 +22,7 @@
     "test": "npm --prefix server test && npm --prefix ui test && npm --prefix docs test",
     "screenshots": "scripts/capture-screenshots.sh",
     "walkthrough": "scripts/capture-walkthrough.sh",
+    "install-demo": "scripts/capture-install.sh",
     "og": "scripts/generate-og.sh",
     "install:all": "npm install && npm --prefix server install && npm --prefix ui install",
     "diagrams": "node scripts/diagrams/build.mjs"

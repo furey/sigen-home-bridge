@@ -21,7 +21,7 @@
 ## Contents
 
 - [Demo](#demo)
-- [What `sigen-home-bridge` is](#what-sigen-home-bridge-is)
+- [Overview](#overview)
 - [What `sigen-home-bridge` isn't](#what-sigen-home-bridge-isnt)
 - [Features](#features)
 - [Prerequisites](#prerequisites)
@@ -43,9 +43,15 @@
 
 ## Demo
 
-<https://github.com/user-attachments/assets/887a51bc-2f9d-4754-851f-9689c6f6f0e9>
+A walkthrough of the dashboard: live panels, a fullscreen readout, Trends, Devices, and Settings.
 
-## What `sigen-home-bridge` is
+<https://github.com/user-attachments/assets/8ca765af-62df-4b07-a568-b379b502ca1c>
+
+The one-line install, from the `curl` command to the dashboard address.
+
+<https://github.com/user-attachments/assets/881d23a7-30cf-41e1-98c7-68bb8899d0d5>
+
+## Overview
 
 `sigen-home-bridge` reads your Sigenergy gateway over Modbus TCP and surfaces its data multiple ways:
 

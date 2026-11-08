@@ -3,6 +3,7 @@ import { h } from 'vue'
 import TabletDemo from './TabletDemo.vue'
 import HeadingIcon from './HeadingIcon.vue'
 import Diagram from './Diagram.vue'
+import InstallVideo from './InstallVideo.vue'
 import './custom.css'
 
 export default {
@@ -10,6 +11,7 @@ export default {
   enhanceApp: ({ app }) => {
     app.component('HeadingIcon', HeadingIcon)
     app.component('Diagram', Diagram)
+    app.component('InstallVideo', InstallVideo)
   },
   Layout: () =>
     h(DefaultTheme.Layout, null, {

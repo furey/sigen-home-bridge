@@ -7,7 +7,7 @@ SIGEN_URL="${SIGEN_URL%/}"
 PLAYWRIGHT_VERSION="${PLAYWRIGHT_VERSION:-1.60.0}"
 PLAYWRIGHT_IMAGE="${PLAYWRIGHT_IMAGE:-mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-jammy}"
 CHROME_BIN="${CHROME_BIN:-/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell}"
-OUT_NAME="${WALKTHROUGH_NAME:-walkthrough}"
+OUT_NAME="${WALKTHROUGH_NAME:-walkthrough-demo}"
 FRAMES_ROOT="${REPO_ROOT}/tmp/walkthrough-frames"
 DEVICES="${WALKTHROUGH_DEVICE:-desktop tablet}"
 MP4="${REPO_ROOT}/${OUT_NAME}.mp4"
@@ -113,7 +113,7 @@ if [ "${WALKTHROUGH_UPLOAD:-1}" = "0" ]; then
   exit 0
 fi
 case " $DEVICES " in *" desktop "*)
-  "${REPO_ROOT}/scripts/upload-walkthrough.sh" "$MP4"
+  "${REPO_ROOT}/scripts/upload-readme-video.sh" "$MP4" 1
   echo "[walkthrough] commit README.md to publish the new Demo URL"
   ;;
 esac
