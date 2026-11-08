@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitepress'
 import { headingIcon } from './headingIcon.mjs'
+import { deviceFrame } from './deviceFrame.mjs'
 
 const repo = 'https://github.com/furey/sigen-home-bridge'
 const site = 'https://furey.github.io/sigen-home-bridge/'
@@ -28,7 +29,12 @@ export default defineConfig({
   metaChunk: true,
   srcExclude: ['DEEP_DIVE.md', 'README.md', '**/node_modules/**'],
   sitemap: { hostname: site },
-  markdown: { config: headingIcon },
+  markdown: {
+    config: (md) => {
+      headingIcon(md)
+      deviceFrame(md)
+    }
+  },
 
   head: [
     ['link', { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/sigen-home-bridge/favicon-32.png' }],
