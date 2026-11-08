@@ -9,6 +9,7 @@ x-logging: &logging
 
 services:
   sigen-home-bridge:
+    image: ghcr.io/furey/sigen-home-bridge:latest
     build: .
     container_name: sigen-home-bridge
     restart: unless-stopped

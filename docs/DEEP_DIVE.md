@@ -23,6 +23,7 @@ The technical companion to [`README.md`](../README.md): what the bridge is doing
 - [Recording the walkthrough video](#recording-the-walkthrough-video)
 - [Project layout](#project-layout)
 - [Scripts](#scripts)
+- [Releasing the image](#releasing-the-image)
 - [Verifying the gateway](#verifying-the-gateway)
 - [Security model](#security-model)
 
@@ -544,6 +545,7 @@ sigen-home-bridge/
 │   └── screenshots/    README captures (desktop, tablet, phone)
 ├── Dockerfile          two-stage: build the UI, run the server
 ├── compose.yaml        bridge + optional cloudflared (tunnel profile)
+├── install.sh          one-line installer (downloads compose.yaml, writes .env)
 ├── .env.example
 └── LICENSE
 ```
@@ -558,11 +560,22 @@ Run from the repository root.
 | `npm run dev`         | Run the bridge and the Vite dev server together                                                  |
 | `npm run build`       | Build the UI into `ui/dist`                                                                      |
 | `npm start`           | Start the bridge (serves the built UI)                                                           |
-| `npm test`            | Run the server and UI unit tests                                                                 |
+| `npm test`            | Run the server, UI, and docs unit tests                                                          |
 | `npm run probe`       | Read the gateway once and print decoded values                                                   |
 | `npm run screenshots` | Recapture the README screenshots (Docker + Playwright)                                           |
 | `npm run walkthrough` | Record and publish the desktop and tablet walkthrough videos (Docker + headless Chrome + ffmpeg) |
 | `npm run og`          | Regenerate the docs social preview card (Docker + Playwright)                                    |
+
+## Releasing the image
+
+The `Image` workflow (`.github/workflows/image.yml`) builds the Docker image for `amd64` and `arm64` and boots each build until `/api/state` answers. A push to `main` that changes `Dockerfile`, `server/`, or `ui/` runs it without publishing. To publish, bump the version in `package.json`, `server/package.json`, and `ui/package.json`, then push a tag with no `v` prefix:
+
+```bash
+git tag 1.0.1
+git push origin 1.0.1
+```
+
+The tag publishes `ghcr.io/furey/sigen-home-bridge:1.0.1` and `:latest`. The first publish creates a private package; make it public once under the repository's **Packages → sigen-home-bridge → Package settings**, or the install script can't pull it. To run your own checkout in Docker instead of the published image, use `docker compose up -d --build`.
 
 ## Verifying the gateway
 

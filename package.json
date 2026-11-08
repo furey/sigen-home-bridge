@@ -1,6 +1,6 @@
 {
   "name": "sigen-home-bridge",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Local Modbus TCP bridge exposing Sigenergy solar and battery data to Apple HomeKit, Google Home, and a web dashboard.",
   "type": "module",
   "license": "MIT",
