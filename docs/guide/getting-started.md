@@ -77,7 +77,7 @@ Everything is editable later from the gear icon: how often it checks, battery si
 
 ## Where next
 
-- Learn the [dashboard](/guide/dashboard) and its trends chart.
+- Learn the [dashboard](/guide/dashboard) and its [trends chart](/guide/trends).
 - Turn live grid flow into money with [tariffs & cost](/guide/tariffs).
 - Get pinged when something needs attention with [alerts](/guide/alerts).
 - Reach the dashboard [from outside the house](/guide/remote-access), safely.

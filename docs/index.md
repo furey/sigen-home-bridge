@@ -49,7 +49,7 @@ features:
       dark: /icons/chart-spline-dark.svg
     title: Trends & history
     details: Every reading on one chart with a day/night sky backdrop. Scrub back through your history, then export it as CSV or JSON.
-    link: /guide/dashboard#trends
+    link: /guide/trends
     linkText: About trends
   - icon:
       light: /icons/bell-ring-light.svg

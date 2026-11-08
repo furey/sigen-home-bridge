@@ -98,6 +98,7 @@ export default withMermaid(defineConfig({
           collapsed: false,
           items: [
             { text: 'The dashboard', link: '/guide/dashboard' },
+            { text: 'Trends', link: '/guide/trends' },
             { text: 'Devices', link: '/guide/devices' },
             { text: 'Tariffs & cost', link: '/guide/tariffs' },
             { text: 'Alerts', link: '/guide/alerts' }
