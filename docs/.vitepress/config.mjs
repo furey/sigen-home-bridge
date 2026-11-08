@@ -91,7 +91,7 @@ export default withMermaid(defineConfig({
           text: 'Start here',
           collapsed: false,
           items: [
-            { text: 'Introduction', link: '/guide/' },
+            { text: 'Overview', link: '/guide/' },
             { text: 'Getting started', link: '/guide/getting-started' }
           ]
         },

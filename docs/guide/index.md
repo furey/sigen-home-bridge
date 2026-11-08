@@ -1,10 +1,10 @@
 ---
-title: Introduction
+title: Overview
 icon: sigen
 description: sigen-home-bridge reads your Sigenergy solar and battery over your home network and shows the numbers on a dashboard, in Apple Home, and in Google Home.
 ---
 
-# Introduction
+# Overview
 
 `sigen-home-bridge` is a small self-hosted service that reads your Sigenergy system straight off your home network and shows you the numbers. You run it on a machine at home (a NAS, a Raspberry Pi, an old laptop). It talks to your gateway directly, so nothing leaves the house and you don't need a Sigenergy cloud account or Home Assistant.
 
