@@ -29,6 +29,7 @@ export default withMermaid(defineConfig({
   metaChunk: true,
   srcExclude: ['DEEP_DIVE.md', 'README.md', '**/node_modules/**'],
   sitemap: { hostname: site },
+  vite: { optimizeDeps: { include: ['mermaid > fastdom', 'mermaid > fastdom/extensions/fastdom-promised.js'] } },
   markdown: { config: headingIcon },
 
   head: [
