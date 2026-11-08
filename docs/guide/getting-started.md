@@ -1,7 +1,7 @@
 ---
 title: Getting started
 icon: rocket
-description: Switch on the local data feed, run one Docker command, open the dashboard, and point the bridge at your gateway.
+description: Switch on the local data feed, run one install command, open the dashboard, and point the bridge at your gateway.
 ---
 
 # Getting started
@@ -20,17 +20,48 @@ If that option isn't there, your account may need installer-level access. Ask yo
 
 ## 2. Run the bridge
 
-On a machine on the same network as your gateway, with Docker installed:
+On a machine on the same network as your gateway, with [Docker](https://docs.docker.com/) and [Compose v2](https://docs.docker.com/compose/install/) installed (the image runs on `amd64` and `arm64`), run this in the folder where you want a `sigen-home-bridge` folder to appear:
 
 ```bash
-git clone https://github.com/furey/sigen-home-bridge
-cd sigen-home-bridge
-cp .env.example .env
-docker compose up -d --build
+curl -fsSL https://raw.githubusercontent.com/furey/sigen-home-bridge/main/install.sh | sh
 ```
 
+The script creates the `sigen-home-bridge` folder, downloads its `compose.yaml`, and writes a `.env` (the settings file Docker Compose reads) with your time zone filled in. On Linux it also sets `HOMEKIT_BIND` to your network interface, so Apple Home advertises only on your home network. It shows those values and asks before it starts; press `Enter` to accept them. The bridge then downloads and starts, and the script prints the dashboard address.
+
+::: details Install script options
+Press `e` to edit the `.env` first (in `vi`, unless you set `EDITOR`), `n` to stop without starting anything, or `Esc` to cancel. Run the script again at any time; it keeps an existing `.env` and `compose.yaml`. On a NAS, sign in over SSH first, and use `sudo` if your user can't reach Docker.
+:::
+
+### Run the bridge: by hand
+
+Use this instead of the script to run each command yourself:
+
+1. Create a folder and move into it:
+
+   ```bash
+   mkdir sigen-home-bridge && cd sigen-home-bridge
+   ```
+
+2. Download the Compose file:
+
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/furey/sigen-home-bridge/main/compose.yaml -o compose.yaml
+   ```
+
+3. Download the settings file, then set `TZ` in it to your time zone (e.g. `Australia/Sydney`):
+
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/furey/sigen-home-bridge/main/.env.example -o .env
+   ```
+
+4. Start the bridge:
+
+   ```bash
+   docker compose up -d
+   ```
+
 ::: info Why host networking?
-The container runs with `network_mode: host` because Apple Home discovery doesn't work across Docker's private network. On a host with extra Docker networks (common on a NAS), also set `HOMEKIT_BIND=eth0` (your network interface) in `.env`. More in [Troubleshooting](/guide/troubleshooting).
+The container runs with `network_mode: host` because Apple Home discovery doesn't work across Docker's private network. If you install by hand on a host with extra Docker networks (common on a NAS), also set `HOMEKIT_BIND=eth0` (your network interface) in `.env`; the install script does this for you on Linux. More in [Troubleshooting](/guide/troubleshooting).
 :::
 
 ## 3. Open the dashboard and point it at your gateway
@@ -74,7 +105,18 @@ The dashboard installs as a home-screen app on any phone or tablet. On iPhone or
 
 ![Settings, gateway section](../screenshots/settings-connection.png)
 
-Everything is editable later from the gear icon: how often it checks, battery size, power units, alerts, tariffs, themes, weather, Apple Home, Google Home. No `.env` editing, and most changes apply without a restart.
+Everything is editable later from the gear icon: how often it checks, battery size, power units, alerts, tariffs, themes, weather, Apple Home, Google Home. No `.env` editing after setup, and most changes apply without a restart.
+
+## Updating
+
+In the `sigen-home-bridge` folder, download the new image, then restart the bridge:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+Your settings, Apple Home pairing, and history live in a Docker volume, so they survive the update.
 
 ## Where next
 
