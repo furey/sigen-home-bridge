@@ -6,7 +6,7 @@ description: The live panels, the fullscreen readouts, and how to theme it all.
 
 # The dashboard
 
-The dashboard is the main screen: solar, battery, grid, and home usage, each in its own panel, all updating as the bridge reads your system. The title sits top centre, the outdoor temperature top left, and the gear (settings) top right. Along the bottom you get the connection state, the last-updated time, and a link to the source on GitHub.
+The dashboard is the main screen: solar, battery, grid, and home usage, each in its own panel, all updating as the bridge reads your system. The title sits top centre, the outdoor temperature top left, and Settings top right. Along the bottom you get the connection state, the last-updated time, and a link to the source on GitHub.
 
 ![The dashboard](../screenshots/dashboard-tablet.png)
 

@@ -22,6 +22,11 @@ test('leaves cropped screenshots unframed', () => {
   assert.doesNotMatch(render('![The dashboard](../screenshots/dashboard-desktop.png)'), /device-frame/)
 })
 
+test('gives cropped screenshots a bordered class instead of a frame', () => {
+  assert.match(render('![Settings, Apple Home section](../screenshots/settings-apple-home.png)'), /<img[^>]*class="doc-screenshot"/)
+  assert.doesNotMatch(render('![The dashboard](../screenshots/dashboard-tablet.png)'), /doc-screenshot/)
+})
+
 test('leaves other images unframed', () => {
   assert.doesNotMatch(render('![Logo](/logo.svg)'), /device-frame/)
 })

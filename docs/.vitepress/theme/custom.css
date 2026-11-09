@@ -223,6 +223,12 @@ h1.title,
   margin: 0;
 }
 
+/* Cropped app screenshots get a hairline edge so they don't float on the page. */
+.vp-doc img.doc-screenshot {
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 10px;
+}
+
 /* Keyboard hints (used on the trends and passcode pages). */
 kbd {
   display: inline-block;

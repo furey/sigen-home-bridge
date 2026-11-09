@@ -107,7 +107,7 @@ The dashboard installs as a home-screen app on any phone or tablet. On iPhone or
 
 ![Settings, gateway section](../screenshots/settings-connection.png)
 
-Everything is editable later from the gear icon: how often it checks, battery size, power units, alerts, tariffs, themes, weather, Apple Home, Google Home. No `.env` editing after setup, and most changes apply without a restart.
+Everything is editable later in Settings: how often it checks, battery size, power units, alerts, tariffs, themes, weather, Apple Home, Google Home. No `.env` editing after setup, and most changes apply without a restart.
 
 ## Updating
 
