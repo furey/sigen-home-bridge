@@ -146,7 +146,7 @@ const shotWizard = async (browser) => {
     if (host) host.value = '192.168.1.50'
   })
   const card = await page.locator('section.max-w-2xl').first().boundingBox()
-  const pad = 24
+  const pad = 72
   await page.screenshot({
     path: `${OUT}/wizard-gateway.png`,
     clip: { x: card.x - pad, y: card.y - pad, width: card.width + pad * 2, height: card.height + pad * 2 }
