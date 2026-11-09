@@ -132,13 +132,25 @@ const shotWizard = async (browser) => {
   const getStarted = page.getByRole('button', { name: /Get started/i })
   if (await getStarted.count()) await getStarted.first().click()
   await wait(page, 600)
+  const hostInput = page.locator('input[placeholder="192.168.1.50"]').first()
+  if (!(await hostInput.inputValue())) {
+    const { sigen } = await (await fetch(`${BASE}/api/settings`)).json()
+    const gatewayHost = sigen.host || process.env.SHOT_GATEWAY_HOST
+    if (!gatewayHost) throw new Error('the wizard starts with no gateway host; set SHOT_GATEWAY_HOST')
+    await hostInput.fill(gatewayHost)
+  }
   await page.getByRole('button', { name: /Test connection/i }).first().click()
   await page.getByText(/Reached gateway/i).first().waitFor({ timeout: 20000 })
   await page.evaluate(() => {
     const host = document.querySelector('input[placeholder="192.168.1.50"]')
     if (host) host.value = '192.168.1.50'
   })
-  await page.locator('section.max-w-2xl').first().screenshot({ path: `${OUT}/wizard-gateway.png` })
+  const card = await page.locator('section.max-w-2xl').first().boundingBox()
+  const pad = 24
+  await page.screenshot({
+    path: `${OUT}/wizard-gateway.png`,
+    clip: { x: card.x - pad, y: card.y - pad, width: card.width + pad * 2, height: card.height + pad * 2 }
+  })
   await context.close()
 }
 
