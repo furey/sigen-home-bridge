@@ -8,7 +8,8 @@ set -eu
 # Makes a folder (./sigen-home-bridge, or SIGEN_DIR), downloads compose.yaml,
 # writes a .env from .env.example with your time zone and LAN interface for you
 # to confirm, then starts the bridge. Re-running it keeps an existing .env and
-# compose file.
+# asks before it replaces a changed compose file (the old copy goes to
+# compose.yaml.bak).
 
 SIGEN_DIR="${SIGEN_DIR:-$PWD/sigen-home-bridge}"
 SIGEN_REF="${SIGEN_REF:-main}"
@@ -128,12 +129,50 @@ mkdir -p "$SIGEN_DIR"
 cd "$SIGEN_DIR"
 info "folder: $SIGEN_DIR"
 
+refresh_compose() {
+  if ! curl -fsSL "$RAW_URL/compose.yaml" -o compose.yaml.next; then
+    rm -f compose.yaml.next
+    warn "could not check for a newer compose.yaml; keeping yours"
+    return 0
+  fi
+  if cmp -s compose.yaml compose.yaml.next; then
+    rm -f compose.yaml.next
+    info "compose.yaml is up to date"
+    return 0
+  fi
+  warn "compose.yaml differs from the latest version."
+  answer="$(ask_key 'Replace it (old copy kept as compose.yaml.bak)? [y/N]' "yYnN$ESC")"
+  case "$answer" in
+    "$ESC")
+      rm -f compose.yaml.next
+      warn "cancelled. Nothing changed. Run this script again when you are ready."
+      exit 0
+      ;;
+    y|Y)
+      mv compose.yaml compose.yaml.bak
+      mv compose.yaml.next compose.yaml
+      ok "updated compose.yaml (old copy: compose.yaml.bak)"
+      ;;
+    *)
+      rm -f compose.yaml.next
+      info "keeping the existing compose.yaml"
+      ;;
+  esac
+}
+
+warn_docker_desktop() {
+  [ "$(uname -s)" = "Darwin" ] || return 0
+  docker info --format '{{.OperatingSystem}}' 2>/dev/null | grep -q 'Docker Desktop' || return 0
+  warn "Docker Desktop needs host networking turned on: Settings > Resources > Network > Enable host networking (Docker Desktop 4.34 or later, signed in)."
+}
+
 if [ -f compose.yaml ]; then
-  info "keeping the existing compose.yaml"
+  refresh_compose
 else
   download compose.yaml compose.yaml
   ok "downloaded compose.yaml"
 fi
+warn_docker_desktop
 
 if [ -f .env ]; then
   env_line="keeping the existing .env"

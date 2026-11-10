@@ -31,7 +31,7 @@ curl -fsSL https://raw.githubusercontent.com/furey/sigen-home-bridge/main/instal
 The script creates the `sigen-home-bridge` folder, downloads its `compose.yaml`, and writes a `.env` (the settings file Docker Compose reads) with your time zone filled in. On Linux it also sets `HOMEKIT_BIND` to your network interface, so Apple Home advertises only on your home network. It shows those values and asks before it starts; press `Enter` to accept them. The bridge then downloads and starts, and the script prints the dashboard address.
 
 ::: details Install script options
-Press `e` to edit the `.env` first (in `vi`, unless you set `EDITOR`), `n` to stop without starting anything, or `Esc` to cancel. Run the script again at any time; it keeps an existing `.env` and `compose.yaml`. On a NAS, sign in over SSH first, and use `sudo` if your user can't reach Docker.
+Press `e` to edit the `.env` first (in `vi`, unless you set `EDITOR`), `n` to stop without starting anything, or `Esc` to cancel. Run the script again at any time. It keeps an existing `.env`. If your `compose.yaml` differs from the latest one, it asks before it replaces it (the old copy goes to `compose.yaml.bak`); with no terminal to ask, it keeps yours. On a NAS, sign in over SSH first, and use `sudo` if your user can't reach Docker.
 :::
 
 ### Run the bridge: by hand
@@ -64,6 +64,8 @@ Use this instead of the script to run each command yourself:
 
 ::: info Why host networking?
 The container runs with `network_mode: host` because Apple Home discovery doesn't work across Docker's private network. If you install by hand on a host with extra Docker networks (common on a NAS), also set `HOMEKIT_BIND=eth0` (your network interface) in `.env`; the install script does this for you on Linux. More in [Troubleshooting](/guide/troubleshooting).
+
+On a Mac with Docker Desktop, turn on host networking first: **Settings → Resources → Network → Enable host networking** (Docker Desktop `4.34` or later, signed in to a Docker account). The install script reminds you.
 :::
 
 ## 3. Open the dashboard and point it at your gateway

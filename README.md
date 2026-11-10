@@ -125,10 +125,10 @@ On a machine with Docker and Compose v2, run this in the folder where you want a
 curl -fsSL https://raw.githubusercontent.com/furey/sigen-home-bridge/main/install.sh | sh
 ```
 
-The script downloads `compose.yaml`, writes a `.env` with your time zone (and, on Linux, `HOMEKIT_BIND`), asks before it starts, then pulls `ghcr.io/furey/sigen-home-bridge` and starts it. To install by hand instead, see [Getting started](https://furey.github.io/sigen-home-bridge/guide/getting-started#run-the-bridge-by-hand). To update later, run `docker compose pull && docker compose up -d` in that folder.
+The script downloads `compose.yaml`, writes a `.env` with your time zone (and, on Linux, `HOMEKIT_BIND`), asks before it starts, then pulls `ghcr.io/furey/sigen-home-bridge` and starts it. To install by hand instead, see [Getting started](https://furey.github.io/sigen-home-bridge/guide/getting-started#run-the-bridge-by-hand). To update later, run `docker compose pull && docker compose up -d` in that folder. Re-running the script keeps your `.env` and asks before it replaces a changed `compose.yaml`.
 
 > [!NOTE]<br>
-> The container runs with `network_mode: host` because Apple Home discovery (Bonjour/mDNS) doesn't traverse Docker's bridge network. The install script sets `HOMEKIT_BIND` to your LAN interface on Linux; on a host with extra Docker networks (typical on a NAS), check it in `.env` (see [Troubleshooting](#troubleshooting)).
+> The container runs with `network_mode: host` because Apple Home discovery (Bonjour/mDNS) doesn't traverse Docker's bridge network. The install script sets `HOMEKIT_BIND` to your LAN interface on Linux; on a host with extra Docker networks (typical on a NAS), check it in `.env` (see [Troubleshooting](#troubleshooting)). On a Mac with Docker Desktop, turn on host networking first: **Settings → Resources → Network → Enable host networking** (Docker Desktop `4.34` or later, signed in to a Docker account).
 
 ### 3. Open the dashboard
 
