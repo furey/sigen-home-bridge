@@ -73,10 +73,63 @@ const architecture = (t) => {
   }
 }
 
-const endpoint = ({ x, y, icon, tone, title, sub = [] }, t) => [
+const architecturePhone = (t) => {
+  const outputs = [
+    { icon: 'house', tone: 'fuchsia', title: 'Apple Home', sub: 'iPhone, iPad, HomePod' },
+    { icon: 'layout-dashboard', tone: 'amber', title: 'Dashboard', sub: 'any browser, live updates' },
+    { icon: 'braces', tone: 'orange', title: 'JSON API', sub: 'scripts, Home Assistant' },
+    { icon: 'cloud', tone: 'cyan', title: 'Google Home', sub: 'through Cloudflare Tunnel', internet: true }
+  ]
+  const panel = { x: 16, y: 196, w: 328, h: 228 }
+  const panelBottom = panel.y + panel.h
+  const spineX = 40
+  const rowY = (i) => panelBottom + 64 + i * 76
+  const legendY = rowY(outputs.length - 1) + 72
+  return {
+    width: 360,
+    height: legendY + 40,
+    body: [
+      endpoint({ x: 100, y: 24, icon: 'battery-charging', tone: 'sky', title: 'Sigenergy gateway', sub: ['solar, battery, grid'] }, t),
+      endpoint({ x: 260, y: 24, icon: 'thermometer-sun', tone: 'neutral', title: 'Open-Meteo', sub: ['outdoor temperature,', 'located by IP'] }, t),
+      link({ d: `M100 132 V${panel.y - 4}`, t, arrow: true }),
+      note({ x: 110, y: 172, text: 'Modbus TCP, read only', t, anchor: 'start' }),
+      link({ d: `M260 150 V${panel.y - 4}`, t, dashed: true, arrow: true }),
+      `<rect x="${panel.x}" y="${panel.y}" width="${panel.w}" height="${panel.h}" rx="18" fill="${t.panel}"/>`,
+      text({ x: panel.x + 24, y: panel.y + 38, text: 'sigen-home-bridge', size: 17, weight: 650, fill: t.text, anchor: 'start' }),
+      text({ x: panel.x + 24, y: panel.y + 60, text: 'one Docker container on your home network', size: 13, fill: t.muted, anchor: 'start' }),
+      fact({ x: panel.x + 24, y: panel.y + 104, icon: 'timer', title: 'Reads every 5 s', sub: 'or on your schedule', t }),
+      fact({ x: panel.x + 24, y: panel.y + 150, icon: 'clock', title: 'Keeps history', sub: 'SQLite, 31 to 90 days', t }),
+      fact({ x: panel.x + 24, y: panel.y + 196, icon: 'layers', title: 'Saves settings', sub: 'settings.json', t }),
+      ...outputs.map((o, i) => link({
+        d: `M${spineX} ${i === 0 ? panelBottom : rowY(i - 1) - 14} V${rowY(i) - 14} Q${spineX} ${rowY(i)} ${spineX + 14} ${rowY(i)} H${spineX + 32}`,
+        t,
+        dashed: o.internet,
+        arrow: true
+      })),
+      ...outputs.map((o, i) => outputRow({ ...o, x: spineX + 36, y: rowY(i), t })),
+      legendStacked({ x: spineX, y: legendY, t })
+    ]
+  }
+}
+
+const outputRow = ({ x, y, icon, tone, title, sub, t }) => [
+  `<rect x="${x}" y="${y - 26}" width="52" height="52" rx="12" fill="${t.tile}"/>`,
+  iconAt({ name: icon, x: x + 13, y: y - 13, size: 26, colour: t.tones[tone] }),
+  text({ x: x + 68, y: y - 3, text: title, size: 15, weight: 600, fill: t.text, anchor: 'start' }),
+  text({ x: x + 68, y: y + 16, text: sub, size: 13, fill: t.muted, anchor: 'start' })
+].join('')
+
+const legendStacked = ({ x, y, t }) => [
+  `<path d="M${x} ${y} h30" stroke="${t.line}" stroke-width="1.5"/>`,
+  text({ x: x + 40, y: y + 4.5, text: 'on your home network', size: 12.5, fill: t.muted, anchor: 'start' }),
+  `<path d="M${x} ${y + 24} h30" stroke="${t.line}" stroke-width="1.5" stroke-dasharray="4 4"/>`,
+  text({ x: x + 40, y: y + 28.5, text: 'over the internet', size: 12.5, fill: t.muted, anchor: 'start' })
+].join('')
+
+const endpoint = ({ x, y, icon, tone, title, titleSize = 15, sub = [] }, t) => [
   `<rect x="${x - 26}" y="${y}" width="52" height="52" rx="12" fill="${t.tile}"/>`,
   iconAt({ name: icon, x: x - 13, y: y + 13, size: 26, colour: t.tones[tone] }),
-  text({ x, y: y + 78, text: title, size: 15, weight: 600, fill: t.text }),
+  ...[title].flat().map((line, i) => text({ x, y: y + 78 + i * 18, text: line, size: titleSize, weight: 600, fill: t.text })),
   ...sub.map((line, i) => text({ x, y: y + 98 + i * 17, text: line, size: 13, fill: t.muted }))
 ].join('')
 
@@ -135,6 +188,62 @@ const poller = (t) => ({
     endpoint({ x: 340, y: 420, icon: 'wifi-off', tone: 'rose', title: 'Offline', sub: ['last readings stay', 'on screen'] }, t)
   ]
 })
+
+const pollerPhone = (t) => ({
+  width: 360,
+  height: 590,
+  body: [
+    link({ d: 'M180 138 C180 190 100 180 100 234', t, arrow: true }),
+    note({ x: 158, y: 196, text: 'socket open', t, anchor: 'start' }),
+    link({ d: 'M130 256 H228', t, arrow: true }),
+    note({ x: 180, y: 244, text: 'publish readings', t }),
+    link({ d: 'M230 280 H132', t, arrow: true }),
+    note({ x: 180, y: 300, text: 'timer fires', t }),
+    link({ d: 'M100 368 C100 436 112 476 148 476', t, arrow: true }),
+    note({ x: 110, y: 414, text: 'read or connect error', t, anchor: 'start' }),
+    link({ d: 'M212 476 C404 476 404 50 212 50', t, arrow: true, dashed: true }),
+    note({ x: 284, y: 508, text: 'retry after a delay', t }),
+    endpoint({ x: 180, y: 24, icon: 'plug', tone: 'sky', title: 'Connect', sub: ['open one Modbus socket'] }, t),
+    endpoint({ x: 100, y: 240, icon: 'refresh-cw', tone: 'green', title: 'Read', sub: ['one pass over', 'the registers'] }, t),
+    endpoint({ x: 260, y: 240, icon: 'timer', tone: 'neutral', title: 'Wait', sub: ['your poll interval'] }, t),
+    endpoint({ x: 180, y: 450, icon: 'wifi-off', tone: 'rose', title: 'Offline', sub: ['last readings stay', 'on screen'] }, t)
+  ]
+})
+
+const appleHomePhone = (t) => {
+  const rows = [
+    { icon: 'sun', tone: 'amber', name: 'Solar', value: '2.5 kW', tile: 'Solar Production', shown: '2.5°' },
+    { icon: 'house', tone: 'neutral', name: 'Home', value: '0.4 kW', tile: 'Home Consumption', shown: '0.4°' },
+    { icon: 'utility-pole', tone: 'blue', name: 'Grid', value: '0.0 kW', tile: 'Grid Power', shown: '0.0°' },
+    { icon: 'battery-medium', tone: 'violet', name: 'Battery', value: '2.3 kW charging', tile: 'Battery Power', shown: '2.3°' },
+    { icon: 'battery-charging', tone: 'green', name: 'Battery charge', value: '31%', tile: 'Humidity', shown: '31%', humid: true }
+  ]
+  const top = 52
+  const step = 80
+  const footY = top + rows.length * step + 26
+  return {
+    width: 360,
+    height: footY + 38,
+    body: [
+      text({ x: 16, y: 30, text: 'On the dashboard', size: 13, weight: 600, fill: t.muted, anchor: 'start' }),
+      text({ x: 174, y: 30, text: 'In the Home app', size: 13, weight: 600, fill: t.muted, anchor: 'start' }),
+      ...rows.map((row, i) => homeRowPhone({ ...row, y: top + i * step, t })),
+      text({ x: 180, y: footY, text: 'HomeKit has no power sensor, so power', size: 12.5, fill: t.muted }),
+      text({ x: 180, y: footY + 18, text: 'travels as °C and charge as humidity.', size: 12.5, fill: t.muted })
+    ]
+  }
+}
+
+const homeRowPhone = ({ icon, tone, name, value, tile, shown, humid, y, t }) => [
+  iconAt({ name: icon, x: 16, y: y + 12, size: 20, colour: t.tones[tone] }),
+  text({ x: 44, y: y + 27, text: name, size: 14, weight: 600, fill: t.text, anchor: 'start' }),
+  text({ x: 44, y: y + 46, text: value, size: 13, fill: t.tones[tone], anchor: 'start' }),
+  link({ d: `M150 ${y + 34} H168`, t, arrow: true }),
+  `<rect x="174" y="${y}" width="174" height="66" rx="16" fill="${t.panel}"/>`,
+  iconAt({ name: humid ? 'droplet' : 'thermometer', x: 182, y: y + 12, size: 18, colour: t.tones[tone] }),
+  text({ x: 206, y: y + 27, text: tile, size: 13, weight: 600, fill: t.text, anchor: 'start' }),
+  text({ x: 206, y: y + 47, text: shown, size: 13, fill: t.muted, anchor: 'start' })
+].join('')
 
 const appleHome = (t) => {
   const rows = [
@@ -211,6 +320,79 @@ const configuration = (t) => {
   }
 }
 
+const configurationPhone = (t) => {
+  const layers = [
+    { icon: 'layers', tone: 'amber', title: 'settings.json', sub: 'saved in the setup wizard or Settings' },
+    { icon: 'key-round', tone: 'neutral', title: '.env', sub: 'seeds the first boot only' },
+    { icon: 'list-check', tone: 'neutral', title: 'Built-in defaults', sub: 'used when nothing else is set' }
+  ]
+  const hour = 13.5
+  const barX = 18
+  const barY = 330
+  const at = (h) => barX + h * hour
+  const windows = [
+    { from: 8, to: 12, label: '2 s', tone: 'sky' },
+    { from: 17, to: 21, label: '10 s', tone: 'violet' }
+  ]
+  return {
+    width: 360,
+    height: 470,
+    body: [
+      text({ x: 16, y: 30, text: 'Which value wins (top beats bottom)', size: 15, weight: 600, fill: t.text, anchor: 'start' }),
+      ...layers.map((layer, i) => [
+        `<rect x="16" y="${48 + i * 66}" width="328" height="58" rx="12" fill="${t.panel}"/>`,
+        iconAt({ name: layer.icon, x: 32, y: 60 + i * 66, size: 18, colour: t.tones[layer.tone] }),
+        text({ x: 62, y: 73 + i * 66, text: layer.title, size: 14, weight: 600, fill: t.text, anchor: 'start' }),
+        text({ x: 62, y: 92 + i * 66, text: layer.sub, size: 12.5, fill: t.muted, anchor: 'start' })
+      ].join('')),
+      text({ x: 16, y: 270, text: 'When the bridge polls', size: 15, weight: 600, fill: t.text, anchor: 'start' }),
+      text({ x: 344, y: 270, text: 'example schedule', size: 12.5, fill: t.muted, anchor: 'end' }),
+      `<rect x="${barX}" y="${barY}" width="${24 * hour}" height="28" rx="8" fill="${t.tile}"/>`,
+      ...windows.map((w) => [
+        `<rect x="${at(w.from)}" y="${barY}" width="${(w.to - w.from) * hour}" height="28" rx="8" fill="${t.tones[w.tone]}" fill-opacity="0.85"/>`,
+        text({ x: (at(w.from) + at(w.to)) / 2, y: barY - 12, text: w.label, size: 13, weight: 600, fill: t.tones[w.tone] })
+      ].join('')),
+      ...[4, 14.5, 22.5].map((h) => text({ x: at(h), y: barY - 12, text: '5 s', size: 13, fill: t.muted })),
+      ...[0, 6, 12, 18, 24].map((h) => text({ x: at(h), y: barY + 50, text: `${String(h).padStart(2, '0')}:00`, size: 12, fill: t.faint, anchor: h === 0 ? 'start' : h === 24 ? 'end' : 'middle' })),
+      text({ x: 180, y: 418, text: 'Default every 5 s. Each cycle checks the clock,', size: 13, fill: t.muted }),
+      text({ x: 180, y: 437, text: "uses that window's interval, then waits.", size: 13, fill: t.muted })
+    ]
+  }
+}
+
+const googlePhone = (t) => {
+  const lane = { g: 58, t: 182, b: 300 }
+  const steps = [
+    { title: 'Link the account', ask: '/auth, then /token', reply: 'bearer token (client secret checked)' },
+    { title: 'SYNC: which devices?', ask: 'POST /fulfillment', reply: 'battery + four power devices' },
+    { title: 'QUERY: current values?', ask: 'POST /fulfillment', reply: 'current readings from state' }
+  ]
+  const top = 184
+  const step = 112
+  const bottom = top + steps.length * step - 20
+  return {
+    width: 368,
+    height: bottom + 20,
+    body: [
+      ...Object.values(lane).map((x) => `<path d="M${x} 136 V${bottom}" stroke="${t.line}" stroke-width="1" stroke-dasharray="2 5" stroke-linecap="round"/>`),
+      endpoint({ x: lane.g, y: 24, icon: 'cloud', tone: 'cyan', title: 'Google Home', titleSize: 14 }, t),
+      endpoint({ x: lane.t, y: 24, icon: 'globe', tone: 'indigo', title: ['Cloudflare', 'Tunnel'], titleSize: 14 }, t),
+      endpoint({ x: lane.b, y: 24, icon: 'container', tone: 'amber', title: 'sigen-home-bridge', titleSize: 14 }, t),
+      ...steps.map((s, i) => {
+        const y = top + i * step
+        return [
+          text({ x: 184, y: y - 16, text: `${i + 1}. ${s.title}`, size: 14, weight: 600, fill: t.text, halo: t.page }),
+          link({ d: `M${lane.g + 4} ${y + 14} H${lane.b - 6}`, t, arrow: true }),
+          `<circle cx="${lane.t}" cy="${y + 14}" r="4" fill="${t.page}" stroke="${t.tones.indigo}" stroke-width="1.5"/>`,
+          note({ x: (lane.g + lane.t) / 2, y: y + 6, text: s.ask, t }),
+          link({ d: `M${lane.b - 4} ${y + 46} H${lane.g + 6}`, t, arrow: true, dashed: true }),
+          note({ x: 184, y: y + 38, text: s.reply, t })
+        ].join('')
+      })
+    ]
+  }
+}
+
 const google = (t) => {
   const lane = { g: 110, t: 340, b: 570 }
   const steps = [
@@ -244,6 +426,17 @@ const google = (t) => {
   }
 }
 
-const diagrams = { architecture, poller, 'apple-home': appleHome, configuration, google }
+const diagrams = {
+  architecture,
+  'architecture-phone': architecturePhone,
+  poller,
+  'poller-phone': pollerPhone,
+  'apple-home': appleHome,
+  'apple-home-phone': appleHomePhone,
+  configuration,
+  'configuration-phone': configurationPhone,
+  google,
+  'google-phone': googlePhone
+}
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) buildDiagrams(process.argv[2]?.split(','))

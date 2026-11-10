@@ -31,6 +31,8 @@ The technical companion to [`README.md`](../README.md): what the bridge is doing
 ## Architecture
 
 <picture>
+  <source media="(max-width: 639px) and (prefers-color-scheme: dark)" srcset="public/diagrams/architecture-phone-dark.svg">
+  <source media="(max-width: 639px)" srcset="public/diagrams/architecture-phone-light.svg">
   <source media="(prefers-color-scheme: dark)" srcset="public/diagrams/architecture-dark.svg">
   <img src="public/diagrams/architecture-light.svg" alt="The gateway and Open-Meteo feed one sigen-home-bridge container on your home network, which serves Apple Home, the dashboard, and the JSON API locally, and Google Home through a Cloudflare Tunnel." width="680">
 </picture>
@@ -52,6 +54,8 @@ The gateway address can also be auto-detected. `POST /api/discover/gateway` (the
 If the gateway drops, the poller logs the error, marks the state disconnected, and retries on a fixed delay without ever crashing or zeroing the last known values.
 
 <picture>
+  <source media="(max-width: 639px) and (prefers-color-scheme: dark)" srcset="public/diagrams/poller-phone-dark.svg">
+  <source media="(max-width: 639px)" srcset="public/diagrams/poller-phone-light.svg">
   <source media="(prefers-color-scheme: dark)" srcset="public/diagrams/poller-dark.svg">
   <img src="public/diagrams/poller-light.svg" alt="The poller connects, then loops between reading the registers and waiting for the poll interval. A read or connect error marks it offline, keeps the last readings on screen, and retries after a delay." width="680">
 </picture>
@@ -63,6 +67,8 @@ The weather poller is similarly failure-tolerant: a failed fetch gets one immedi
 Every value in `.env` is a seed for first boot. Once you save in the UI it's written to `/data/settings.json`, which takes precedence (`TZ`, `CLOUDFLARE_TUNNEL_TOKEN`, and `DATA_DIR` are the exceptions; they're read from the environment at process start). Most changes apply immediately: editing the gateway reconnects the Modbus socket, weather reloads its fetch loop, and poll edits take effect on the next cycle. The HomeKit fields and the HTTP server port can't change on a running process, so they're marked "requires restart" and apply on the next start. The Google token is write-only: it's never sent back to the browser (shown as `••••• (stored)`), so leave it blank to keep the current value. The optional Settings passcode is similar: it lands in the `security` section as a salted scrypt hash, the API reports only whether one is set, and once set every settings change must carry a session token from `POST /api/unlock`. Reset returns every setting except history retention to the env seeds, clears the passcode, and re-runs the wizard; stored history and HomeKit pairing are kept.
 
 <picture>
+  <source media="(max-width: 639px) and (prefers-color-scheme: dark)" srcset="public/diagrams/configuration-phone-dark.svg">
+  <source media="(max-width: 639px)" srcset="public/diagrams/configuration-phone-light.svg">
   <source media="(prefers-color-scheme: dark)" srcset="public/diagrams/configuration-dark.svg">
   <img src="public/diagrams/configuration-light.svg" alt="settings.json beats .env, which beats the built-in defaults. A 24-hour bar shows poll windows that override the default interval at set times of day." width="680">
 </picture>
@@ -194,6 +200,8 @@ The power unit is configurable in Settings → Apple Home: `kilowatts` (default,
 One sharp edge comes free with the temperature trick: `CurrentTemperature` is always Celsius on the wire, and the Home app converts it to the home's display unit. A home set to Fahrenheit will show `4.5` as `40.1°F`, so the number stops matching the kW or watts. There's no per-accessory unit override in HomeKit, so the only fixes are setting the Home app to Celsius or reading the values on the dashboard. The UI and README both flag this.
 
 <picture>
+  <source media="(max-width: 639px) and (prefers-color-scheme: dark)" srcset="public/diagrams/apple-home-phone-dark.svg">
+  <source media="(max-width: 639px)" srcset="public/diagrams/apple-home-phone-light.svg">
   <source media="(prefers-color-scheme: dark)" srcset="public/diagrams/apple-home-dark.svg">
   <img src="public/diagrams/apple-home-light.svg" alt="Each power reading on the dashboard appears in the Home app as a temperature sensor, so 2.5 kW of solar shows as 2.5 degrees; battery charge appears as humidity." width="680">
 </picture>
@@ -323,6 +331,8 @@ In the UI the alerts are a collapsible, sortable list (the sort preference rides
 Google has deprecated the Actions Console and is steering integrations toward cloud-to-cloud rather than self-hosted fulfillment, and the old `actions-on-google` library is unmaintained. This project therefore implements the SYNC, QUERY, EXECUTE, and DISCONNECT intents as plain Express handlers with no external library. Everything is read-only; EXECUTE is a no-op.
 
 <picture>
+  <source media="(max-width: 639px) and (prefers-color-scheme: dark)" srcset="public/diagrams/google-phone-dark.svg">
+  <source media="(max-width: 639px)" srcset="public/diagrams/google-phone-light.svg">
   <source media="(prefers-color-scheme: dark)" srcset="public/diagrams/google-dark.svg">
   <img src="public/diagrams/google-light.svg" alt="Google Home reaches the bridge only through the Cloudflare Tunnel: it links the account, asks which devices exist (SYNC), then asks for current values (QUERY)." width="680">
 </picture>

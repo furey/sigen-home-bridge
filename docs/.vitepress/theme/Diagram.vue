@@ -5,13 +5,18 @@ defineProps({
   name: { type: String, required: true },
   alt: { type: String, required: true }
 })
+
+const sources = (file) => ({ light: `/diagrams/${file}-light.svg`, dark: `/diagrams/${file}-dark.svg` })
 </script>
 
 <template>
   <figure class="diagram">
-    <VPImage
-      :image="{ light: `/diagrams/${name}-light.svg`, dark: `/diagrams/${name}-dark.svg`, alt }"
-    />
+    <div class="diagram__wide">
+      <VPImage :image="{ ...sources(name), alt }" />
+    </div>
+    <div class="diagram__phone">
+      <VPImage :image="{ ...sources(`${name}-phone`), alt }" />
+    </div>
   </figure>
 </template>
 
@@ -25,5 +30,19 @@ defineProps({
   display: block;
   width: 100%;
   height: auto;
+}
+
+.diagram__phone {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  .diagram__wide {
+    display: none;
+  }
+
+  .diagram__phone {
+    display: block;
+  }
 }
 </style>
